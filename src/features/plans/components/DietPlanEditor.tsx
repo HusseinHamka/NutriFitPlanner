@@ -153,10 +153,7 @@ export function DietPlanEditor({ diet, onChange }: DietPlanEditorProps) {
             <div className="space-y-2">
               <Label htmlFor="water-intake">Water intake</Label>
               <Input id="water-intake" placeholder="e.g. 4000 ml/day" value={diet.waterIntake} onChange={(e) => onChange({ waterIntake: e.target.value })} />
-              <p className="text-xs text-muted-foreground">Shown on report cover page</p>
-              {!diet.waterIntake.trim() ? (
-                <p className="text-xs text-amber-700">Leave blank and the report will show a dash for water intake.</p>
-              ) : null}
+              <p className="text-xs text-muted-foreground">Optional — only shown on the report when set.</p>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-3">

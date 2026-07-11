@@ -1,6 +1,5 @@
 import {
   Document,
-  Font,
   Image,
   Page,
   StyleSheet,
@@ -29,38 +28,9 @@ import {
   trainerNotes,
 } from '@/services/report/reportLayout'
 import { PdfBrandMark, PdfSectionIcon, type PdfReportIconKind } from '@/services/report/pdfIcons'
+import { registerPdfFonts } from '@/services/report/pdfFonts'
 
-Font.register({
-  family: 'Lora',
-  fonts: [
-    {
-      src: 'https://cdn.jsdelivr.net/fontsource/fonts/lora@latest/latin-400-normal.woff',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/fontsource/fonts/lora@latest/latin-700-normal.woff',
-      fontWeight: 700,
-    },
-  ],
-})
-
-Font.register({
-  family: 'NunitoSans',
-  fonts: [
-    {
-      src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-400-normal.woff',
-      fontWeight: 400,
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-600-normal.woff',
-      fontWeight: 600,
-    },
-    {
-      src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-700-normal.woff',
-      fontWeight: 700,
-    },
-  ],
-})
+registerPdfFonts()
 
 const s = StyleSheet.create({
   page: {
@@ -399,7 +369,7 @@ function ReportHeader({ model }: { model: ReportModel }) {
     <>
       <View style={s.headerRow}>
         <View style={s.brandRow}>
-          {model.business.logoUrl ? (
+          {model.business.logoUrl?.startsWith('data:') ? (
             <Image src={model.business.logoUrl} style={{ width: 34, height: 34, borderRadius: 17 }} />
           ) : (
             <View style={s.logoCircle}>

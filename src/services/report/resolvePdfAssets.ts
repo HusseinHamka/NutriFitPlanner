@@ -26,7 +26,7 @@ export async function prepareReportModelForPdf(model: ReportModel): Promise<Repo
     ...model,
     business: {
       ...model.business,
-      logoUrl: dataUrl,
+      logoUrl: dataUrl?.startsWith('data:') ? dataUrl : null,
     },
   }
 }

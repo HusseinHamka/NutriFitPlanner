@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { saveAs } from 'file-saver'
@@ -81,6 +81,18 @@ export default function PlanEditorPage() {
     enabled: Boolean(planId && plan),
   })
 
+  const previewModel = useMemo(() => {
+    if (!reportQuery.data || !snapshot) return null
+    return {
+      ...reportQuery.data,
+      revision: {
+        ...reportQuery.data.revision,
+        snapshot: normalizePlanSnapshot(snapshot),
+      },
+      generatedAt: new Date().toISOString(),
+    }
+  }, [reportQuery.data, snapshot])
+
   const saveMutation = useMutation({
     mutationFn: (nextSnapshot: PlanSnapshot) => {
       if (!plan) throw new Error('Plan not found')
@@ -144,34 +156,32 @@ export default function PlanEditorPage() {
   }
 
   const exportPdf = async () => {
-    if (!reportQuery.data) return
-    if (!reportQuery.data.revision.snapshot.diet?.waterIntake?.trim()) {
-      const proceed = window.confirm('Water intake is empty. The report cover page will show a dash. Export anyway?')
-      if (!proceed) return
+    if (!previewModel) return
+    try {
+      const blob = await services.export.exportPdf(previewModel)
+      const clientName = fullName(previewModel.client.firstName, previewModel.client.lastName)
+      const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'pdf')
+      saveAs(blob, `${plan?.title ?? 'report'}.pdf`)
+      await services.reports.create({ planRevisionId: previewModel.revision.id, clientId: previewModel.client.id, title, format: 'pdf' })
+      toast.success('PDF exported')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'PDF export failed')
     }
-    const blob = await services.export.exportPdf(reportQuery.data)
-    const clientName = fullName(reportQuery.data.client.firstName, reportQuery.data.client.lastName)
-    const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'pdf')
-    saveAs(blob, `${plan?.title ?? 'report'}.pdf`)
-    await services.reports.create({ planRevisionId: reportQuery.data.revision.id, clientId: reportQuery.data.client.id, title, format: 'pdf' })
-    toast.success('PDF exported')
   }
 
   const exportDocx = async () => {
-    if (!reportQuery.data) return
-    if (!reportQuery.data.revision.snapshot.diet?.waterIntake?.trim()) {
-      const proceed = window.confirm('Water intake is empty. The report cover page will show a dash. Export anyway?')
-      if (!proceed) return
+    if (!previewModel) return
+    try {
+      const blob = await services.export.exportDocx(previewModel)
+      const clientName = fullName(previewModel.client.firstName, previewModel.client.lastName)
+      const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'docx')
+      saveAs(blob, `${plan?.title ?? 'report'}.docx`)
+      await services.reports.create({ planRevisionId: previewModel.revision.id, clientId: previewModel.client.id, title, format: 'docx' })
+      toast.success('DOCX exported')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'DOCX export failed')
     }
-    const blob = await services.export.exportDocx(reportQuery.data)
-    const clientName = fullName(reportQuery.data.client.firstName, reportQuery.data.client.lastName)
-    const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'docx')
-    saveAs(blob, `${plan?.title ?? 'report'}.docx`)
-    await services.reports.create({ planRevisionId: reportQuery.data.revision.id, clientId: reportQuery.data.client.id, title, format: 'docx' })
-    toast.success('DOCX exported')
   }
-
-  const waterIntakeMissing = !snapshot?.diet?.waterIntake?.trim()
 
   if (planQuery.isLoading || !plan || !snapshot) return <PageLoading />
 
@@ -275,16 +285,11 @@ export default function PlanEditorPage() {
         ) : null}
 
         <TabsContent value="preview" className="space-y-4">
-          {waterIntakeMissing ? (
-            <p className="rounded-[var(--radius)] border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Water intake is not set. The report cover page will display a dash unless you add a value in the Diet tab.
-            </p>
-          ) : null}
           <div className="flex gap-2">
             <Button className="bg-deep-forest hover:bg-deep-forest/90" onClick={exportPdf}>Export PDF</Button>
             <Button variant="outline" onClick={exportDocx}>Export DOCX</Button>
           </div>
-          {reportQuery.data ? <ReportRenderer model={reportQuery.data} /> : <p className="text-muted-foreground">Configure business settings to preview reports.</p>}
+          {previewModel ? <ReportRenderer model={previewModel} /> : <p className="text-muted-foreground">Configure business settings to preview reports.</p>}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-3">
