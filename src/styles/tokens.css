@@ -1,0 +1,30 @@
+:root {
+  --color-cream: #f5f0e8;
+  --color-paper: #fbf8f3;
+  --color-soft-sage: #dce5d4;
+  --color-sage-accent: #a8c0a0;
+  --color-deep-forest: #2d5a3d;
+  --color-ink: #2a2f2a;
+  --color-muted: #6b7268;
+  --radius: 8px;
+
+  --background: var(--color-cream);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-deep-forest);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-soft-sage);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-soft-sage);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-sage-accent);
+  --accent-foreground: var(--color-ink);
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #d8d2c8;
+  --input: #d8d2c8;
+  --ring: var(--color-sage-accent);
+}
