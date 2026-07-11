@@ -28,6 +28,11 @@ export function registerPdfFonts() {
         fontWeight: 400,
       },
       {
+        src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-400-italic.woff',
+        fontWeight: 400,
+        fontStyle: 'italic',
+      },
+      {
         src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-600-normal.woff',
         fontWeight: 600,
       },
@@ -45,6 +50,7 @@ export async function ensurePdfFontsLoaded() {
     Font.load({ fontFamily: 'Lora', fontWeight: 400 }),
     Font.load({ fontFamily: 'Lora', fontWeight: 700 }),
     Font.load({ fontFamily: 'NunitoSans', fontWeight: 400 }),
+    Font.load({ fontFamily: 'NunitoSans', fontWeight: 400, fontStyle: 'italic' }),
     Font.load({ fontFamily: 'NunitoSans', fontWeight: 600 }),
     Font.load({ fontFamily: 'NunitoSans', fontWeight: 700 }),
   ])
