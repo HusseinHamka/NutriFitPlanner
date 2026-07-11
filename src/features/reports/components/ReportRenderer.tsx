@@ -1,17 +1,84 @@
 import { fullName } from '@/lib/helpers'
 import { isMeaningfulMealItem } from '@/lib/planSnapshot'
-import type { ReportModel } from '@/types/domain'
 import {
   REPORT_COLORS,
   clientSummary,
+  dayTotalCalories,
   formatWaterIntake,
+  mealTotalCalories,
+  optionTotalCalories,
   planBadgeLabel,
   practitionerSubtitle,
   trainerNotes,
 } from '@/services/report/reportLayout'
+import type { Meal, MealItem, ReportModel } from '@/types/domain'
 
 interface ReportRendererProps {
   model: ReportModel
+}
+
+function MealItemsTable({ items }: { items: MealItem[] }) {
+  const visibleItems = items.filter(isMeaningfulMealItem)
+  if (!visibleItems.length) return null
+
+  return (
+    <>
+      <div className="mt-2 grid grid-cols-[2fr_1fr_1fr] gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: REPORT_COLORS.softSage, color: REPORT_COLORS.deepForest }}>
+        <span>Food</span>
+        <span>Qty</span>
+        <span className="text-right">Kcal</span>
+      </div>
+      {visibleItems.map((item, index) => (
+        <div
+          key={item.id}
+          className="grid grid-cols-[2fr_1fr_1fr] gap-2 border-t px-4 py-2 text-sm"
+          style={{
+            borderColor: REPORT_COLORS.border,
+            backgroundColor: index % 2 === 1 ? REPORT_COLORS.sageLight : REPORT_COLORS.paper,
+          }}
+        >
+          <span>{item.foodName || '—'}</span>
+          <span>{item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}</span>
+          <span className="text-right">{item.calories ?? '—'}</span>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function MealCard({ title, subtitle, items, notes }: { title: string; subtitle?: string; items: MealItem[]; notes?: string }) {
+  const visibleItems = items.filter(isMeaningfulMealItem)
+  if (!visibleItems.length && !notes?.trim()) return null
+
+  return (
+    <div className="overflow-hidden rounded-[var(--radius)] border" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+      <div className="px-4 pt-3">
+        <p className="font-heading text-base" style={{ color: REPORT_COLORS.deepForest }}>{title}</p>
+        {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
+      </div>
+      <MealItemsTable items={items} />
+      {notes ? <p className="px-4 pb-3 text-xs italic text-muted-foreground">{notes}</p> : null}
+    </div>
+  )
+}
+
+function WeeklyMealSchedule({ meals, dayName }: { meals: Meal[]; dayName: string }) {
+  if (!meals.length) return null
+
+  return (
+    <div className="space-y-3">
+      <p className="font-heading text-lg" style={{ color: REPORT_COLORS.deepForest }}>{dayName}</p>
+      {meals.map((meal) => (
+        <MealCard
+          key={meal.id}
+          title={meal.name}
+          subtitle={`${mealTotalCalories(meal)} kcal`}
+          items={meal.items}
+          notes={meal.notes}
+        />
+      ))}
+    </div>
+  )
 }
 
 function SectionHeader({ icon, title }: { icon: string; title: string }) {
@@ -136,35 +203,36 @@ export function ReportRenderer({ model }: ReportRendererProps) {
       {/* Page 2 - Diet details */}
       {diet ? (
         <section className={pageClass} style={{ backgroundColor: REPORT_COLORS.cream }}>
-          <SectionHeader icon="◷" title="Meal schedule" />
+          <SectionHeader icon="◷" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
+          {diet.scheduleMode === 'meal_options' ? (
+            <p className="mb-4 rounded-[var(--radius)] border px-3 py-2 text-sm" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+              Choose one option per meal.
+            </p>
+          ) : null}
           <div className="space-y-4">
-            {diet.meals.map((meal) => {
-              const visibleItems = meal.items.filter(isMeaningfulMealItem)
-              return (
-              <div key={meal.id} className="overflow-hidden rounded-[var(--radius)] border" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-                <p className="px-4 pt-3 font-heading text-base" style={{ color: REPORT_COLORS.deepForest }}>{meal.name}</p>
-                <div className="mt-2 grid grid-cols-[2fr_1fr_1fr] gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: REPORT_COLORS.softSage, color: REPORT_COLORS.deepForest }}>
-                  <span>Food</span>
-                  <span>Qty</span>
-                  <span className="text-right">Kcal</span>
-                </div>
-                {visibleItems.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="grid grid-cols-[2fr_1fr_1fr] gap-2 border-t px-4 py-2 text-sm"
-                    style={{
-                      borderColor: REPORT_COLORS.border,
-                      backgroundColor: index % 2 === 1 ? REPORT_COLORS.sageLight : REPORT_COLORS.paper,
-                    }}
-                  >
-                    <span>{item.foodName || '—'}</span>
-                    <span>{item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}</span>
-                    <span className="text-right">{item.calories ?? '—'}</span>
+            {diet.scheduleMode === 'weekly'
+              ? diet.weeklyDays.map((day) => (
+                  day.meals.length > 0 ? (
+                    <div key={day.id} className="space-y-3">
+                      <WeeklyMealSchedule meals={day.meals} dayName={day.name} />
+                      <p className="text-sm text-muted-foreground">Day total: {dayTotalCalories(day)} kcal</p>
+                    </div>
+                  ) : null
+                ))
+              : diet.mealSlots.map((slot) => (
+                  <div key={slot.id} className="space-y-3">
+                    <p className="font-heading text-lg" style={{ color: REPORT_COLORS.deepForest }}>{slot.name}</p>
+                    {slot.options.map((option) => (
+                      <MealCard
+                        key={option.id}
+                        title={option.name}
+                        subtitle={`${optionTotalCalories(option)} kcal`}
+                        items={option.items}
+                        notes={option.notes}
+                      />
+                    ))}
                   </div>
                 ))}
-                {meal.notes ? <p className="px-4 pb-3 text-xs italic text-muted-foreground">{meal.notes}</p> : null}
-              </div>
-            )})}
           </div>
 
           {supplements.length > 0 ? (

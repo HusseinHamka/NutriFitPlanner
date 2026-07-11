@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -6,16 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { LibraryFoodPicker } from '@/features/plans/components/LibraryFoodPicker'
 import {
-  createMeal,
-  createMealItem,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { MealOptionsDietEditor } from '@/features/plans/components/MealOptionsDietEditor'
+import { WeeklyDietEditor } from '@/features/plans/components/WeeklyDietEditor'
+import { applyFoodToItem } from '@/features/plans/components/mealItemUtils'
+import {
+  createEmptyMealSlots,
+  createEmptyWeeklyDays,
   createSupplementItem,
-  scaleFoodMacros,
 } from '@/lib/planSnapshot'
 import { queryKeys } from '@/lib/queryKeys'
-import { mealTotalCalories } from '@/services/report/reportLayout'
-import type { DietPlanContent, Food, MealItem } from '@/types/domain'
+import { cn } from '@/lib/utils'
+import type { DietPlanContent, DietScheduleMode, Food, MealItem } from '@/types/domain'
 import { services } from '@/services/container'
 
 interface DietPlanEditorProps {
@@ -23,73 +34,113 @@ interface DietPlanEditorProps {
   onChange: (updates: Partial<DietPlanContent>) => void
 }
 
-function applyFoodToItem(item: MealItem, food: Pick<Food, 'calories' | 'protein' | 'carbs' | 'fat' | 'unit'> & { id?: string; name?: string }, quantity: number | null): MealItem {
-  const macros = scaleFoodMacros(food, quantity)
-  return {
-    ...item,
-    mode: food.id ? 'library' : item.mode,
-    foodId: food.id ?? item.foodId,
-    foodName: food.name ?? item.foodName,
-    unit: food.unit || item.unit,
-    ...macros,
-  }
+function hydrateMealItems(items: MealItem[], foodsById: Map<string, Food>): { items: MealItem[]; changed: boolean } {
+  let changed = false
+  const nextItems = items.map((item) => {
+    if (item.mode !== 'library' || !item.foodId) return item
+    const food = foodsById.get(item.foodId)
+    if (!food) return item
+    const next = applyFoodToItem(item, food, item.quantity)
+    if (
+      next.calories !== item.calories
+      || next.protein !== item.protein
+      || next.carbs !== item.carbs
+      || next.fat !== item.fat
+      || next.foodName !== item.foodName
+    ) {
+      changed = true
+      return next
+    }
+    return item
+  })
+  return { items: nextItems, changed }
 }
 
 export function DietPlanEditor({ diet, onChange }: DietPlanEditorProps) {
   const foodsQuery = useQuery({ queryKey: queryKeys.foods, queryFn: () => services.foods.list() })
-  const foodsById = useMemo(() => new Map((foodsQuery.data ?? []).map((food) => [food.id, food])), [foodsQuery.data])
+  const foodsById = useMemo(
+    () => new Map<string, Food>((foodsQuery.data ?? []).map((food) => [food.id, food])),
+    [foodsQuery.data],
+  )
   const hydratedFoodMacros = useRef(false)
+  const [pendingMode, setPendingMode] = useState<DietScheduleMode | null>(null)
 
   useEffect(() => {
     if (!foodsQuery.data?.length || hydratedFoodMacros.current) return
 
     let changed = false
-    const meals = diet.meals.map((meal) => ({
-      ...meal,
-      items: meal.items.map((item) => {
-        if (item.mode !== 'library' || !item.foodId) return item
-        const food = foodsById.get(item.foodId)
-        if (!food) return item
-        const next = applyFoodToItem(item, food, item.quantity)
-        if (
-          next.calories !== item.calories
-          || next.protein !== item.protein
-          || next.carbs !== item.carbs
-          || next.fat !== item.fat
-          || next.foodName !== item.foodName
-        ) {
-          changed = true
-          return next
-        }
-        return item
-      }),
-    }))
+    const weeklyDays = diet.weeklyDays.map((day) => {
+      const meals = day.meals.map((meal) => {
+        const result = hydrateMealItems(meal.items, foodsById)
+        if (result.changed) changed = true
+        return result.changed ? { ...meal, items: result.items } : meal
+      })
+      return meals.some((meal, index) => meal !== day.meals[index]) ? { ...day, meals } : day
+    })
+
+    const mealSlots = diet.mealSlots.map((slot) => {
+      const options = slot.options.map((option) => {
+        const result = hydrateMealItems(option.items, foodsById)
+        if (result.changed) changed = true
+        return result.changed ? { ...option, items: result.items } : option
+      })
+      return options.some((option, index) => option !== slot.options[index]) ? { ...slot, options } : slot
+    })
 
     hydratedFoodMacros.current = true
-    if (changed) onChange({ meals })
-  }, [diet.meals, foodsById, foodsQuery.data, onChange])
+    if (changed) onChange({ weeklyDays, mealSlots })
+  }, [diet.mealSlots, diet.weeklyDays, foodsById, foodsQuery.data, onChange])
 
   useEffect(() => {
     hydratedFoodMacros.current = false
-  }, [diet.goals, diet.meals.length])
+  }, [diet.goals, diet.scheduleMode])
 
-  const resolveFood = (item: MealItem): Pick<Food, 'calories' | 'protein' | 'carbs' | 'fat' | 'unit'> | null => {
-    if (item.foodId) {
-      const food = foodsById.get(item.foodId)
-      if (food) return food
-    }
-    if (!item.foodName) return null
-    return {
-      calories: item.calories,
-      protein: item.protein,
-      carbs: item.carbs,
-      fat: item.fat,
-      unit: item.unit,
-    }
+  const confirmModeSwitch = () => {
+    if (!pendingMode) return
+    onChange({
+      scheduleMode: pendingMode,
+      weeklyDays: createEmptyWeeklyDays(),
+      mealSlots: createEmptyMealSlots(),
+      meals: [],
+    })
+    setPendingMode(null)
   }
 
   return (
     <div className="space-y-4">
+      <Card className="border-border bg-paper">
+        <CardHeader><CardTitle>Schedule Layout</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <div className="inline-flex rounded-[var(--radius)] border border-border p-1">
+            <Button
+              type="button"
+              variant={diet.scheduleMode === 'weekly' ? 'default' : 'ghost'}
+              className={cn(diet.scheduleMode === 'weekly' && 'bg-deep-forest hover:bg-deep-forest/90')}
+              onClick={() => {
+                if (diet.scheduleMode !== 'weekly') setPendingMode('weekly')
+              }}
+            >
+              Weekly schedule
+            </Button>
+            <Button
+              type="button"
+              variant={diet.scheduleMode === 'meal_options' ? 'default' : 'ghost'}
+              className={cn(diet.scheduleMode === 'meal_options' && 'bg-deep-forest hover:bg-deep-forest/90')}
+              onClick={() => {
+                if (diet.scheduleMode !== 'meal_options') setPendingMode('meal_options')
+              }}
+            >
+              Meal options
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {diet.scheduleMode === 'weekly'
+              ? 'Plan meals day by day (Monday through Sunday).'
+              : 'Define alternative meal combinations per slot — client picks one option per meal.'}
+          </p>
+        </CardContent>
+      </Card>
+
       <Card className="border-border bg-paper">
         <CardHeader><CardTitle>Nutrition Goals</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -162,110 +213,19 @@ export function DietPlanEditor({ diet, onChange }: DietPlanEditorProps) {
         </CardContent>
       </Card>
 
-      {diet.meals.map((meal, mealIndex) => (
-        <Card key={meal.id} className="border-border bg-paper">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <Input value={meal.name} onChange={(e) => {
-              const meals = [...diet.meals]
-              meals[mealIndex] = { ...meal, name: e.target.value }
-              onChange({ meals })
-            }} />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => {
-                const items = [...meal.items, createMealItem(meal.items.length)]
-                const meals = [...diet.meals]
-                meals[mealIndex] = { ...meal, items }
-                onChange({ meals })
-              }}>Add Item</Button>
-              <Button variant="ghost" size="icon" aria-label="Remove meal" onClick={() => onChange({ meals: diet.meals.filter((m) => m.id !== meal.id) })}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {meal.items.map((item, itemIndex) => (
-              <div key={item.id} className="flex gap-2">
-                <div className="grid flex-1 gap-2 md:grid-cols-6">
-                  {item.mode === 'library' ? (
-                    <LibraryFoodPicker
-                      value={item.foodId ? foodsById.get(item.foodId) ?? { id: item.foodId, name: item.foodName } as Food : null}
-                      onSelect={(food) => {
-                        const items = [...meal.items]
-                        items[itemIndex] = applyFoodToItem(item, food, item.quantity)
-                        const meals = [...diet.meals]
-                        meals[mealIndex] = { ...meal, items }
-                        onChange({ meals })
-                      }}
-                    />
-                  ) : (
-                    <Input placeholder="Food" value={item.foodName} onChange={(e) => {
-                      const items = [...meal.items]
-                      items[itemIndex] = { ...item, foodName: e.target.value, mode: 'custom', foodId: null }
-                      const meals = [...diet.meals]
-                      meals[mealIndex] = { ...meal, items }
-                      onChange({ meals })
-                    }} />
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const items = [...meal.items]
-                      items[itemIndex] = item.mode === 'library'
-                        ? { ...item, mode: 'custom', foodId: null }
-                        : { ...item, mode: 'library' }
-                      const meals = [...diet.meals]
-                      meals[mealIndex] = { ...meal, items }
-                      onChange({ meals })
-                    }}
-                  >
-                    {item.mode === 'library' ? 'Custom' : 'Library'}
-                  </Button>
-                  <Input placeholder="Qty" type="number" value={item.quantity ?? ''} onChange={(e) => {
-                    const quantity = e.target.value ? Number(e.target.value) : null
-                    const items = [...meal.items]
-                    const food = item.mode === 'library' ? resolveFood(item) : null
-                    items[itemIndex] = food
-                      ? applyFoodToItem(item, food, quantity)
-                      : { ...item, quantity }
-                    const meals = [...diet.meals]
-                    meals[mealIndex] = { ...meal, items }
-                    onChange({ meals })
-                  }} />
-                  <Input placeholder="Unit" value={item.unit} onChange={(e) => {
-                    const items = [...meal.items]
-                    items[itemIndex] = { ...item, unit: e.target.value }
-                    const meals = [...diet.meals]
-                    meals[mealIndex] = { ...meal, items }
-                    onChange({ meals })
-                  }} />
-                  <Input placeholder="Kcal" type="number" value={item.calories ?? ''} onChange={(e) => {
-                    const items = [...meal.items]
-                    items[itemIndex] = { ...item, calories: e.target.value ? Number(e.target.value) : null }
-                    const meals = [...diet.meals]
-                    meals[mealIndex] = { ...meal, items }
-                    onChange({ meals })
-                  }} />
-                </div>
-                <Button variant="ghost" size="icon" aria-label="Remove item" onClick={() => {
-                  const meals = [...diet.meals]
-                  meals[mealIndex] = { ...meal, items: meal.items.filter((i) => i.id !== item.id) }
-                  onChange({ meals })
-                }}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <p className="text-sm text-muted-foreground">Meal total: {mealTotalCalories(meal)} kcal</p>
-            <Textarea placeholder="Meal notes" value={meal.notes} onChange={(e) => {
-              const meals = [...diet.meals]
-              meals[mealIndex] = { ...meal, notes: e.target.value }
-              onChange({ meals })
-            }} />
-          </CardContent>
-        </Card>
-      ))}
-      <Button variant="outline" onClick={() => onChange({ meals: [...diet.meals, createMeal(diet.meals.length)] })}>Add Meal</Button>
+      {diet.scheduleMode === 'weekly' ? (
+        <WeeklyDietEditor
+          weeklyDays={diet.weeklyDays}
+          foodsById={foodsById}
+          onChange={(weeklyDays) => onChange({ weeklyDays })}
+        />
+      ) : (
+        <MealOptionsDietEditor
+          mealSlots={diet.mealSlots}
+          foodsById={foodsById}
+          onChange={(mealSlots) => onChange({ mealSlots })}
+        />
+      )}
 
       <Card className="border-border bg-paper">
         <CardHeader><CardTitle>Recommendations & Notes</CardTitle></CardHeader>
@@ -274,6 +234,23 @@ export function DietPlanEditor({ diet, onChange }: DietPlanEditorProps) {
           <Textarea placeholder="Diet notes" value={diet.notes} onChange={(e) => onChange({ notes: e.target.value })} />
         </CardContent>
       </Card>
+
+      <AlertDialog open={pendingMode !== null} onOpenChange={(open) => !open && setPendingMode(null)}>
+        <AlertDialogContent className="bg-paper">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change schedule layout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Switching layout will clear the current meal schedule. Nutrition goals, supplements, and notes will be kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-deep-forest hover:bg-deep-forest/90" onClick={confirmModeSwitch}>
+              Switch layout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

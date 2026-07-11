@@ -2,6 +2,7 @@ export type PlanType = 'diet' | 'workout' | 'combined'
 export type PlanStatus = 'draft' | 'active' | 'archived' | 'completed'
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type MealType = 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'post_workout' | 'custom'
+export type DietScheduleMode = 'weekly' | 'meal_options'
 export type ReportFormat = 'preview' | 'pdf' | 'docx'
 
 export interface BusinessSettings {
@@ -117,6 +118,30 @@ export interface Meal {
   items: MealItem[]
 }
 
+export interface MealOption {
+  id: string
+  name: string
+  sortOrder: number
+  notes: string
+  items: MealItem[]
+}
+
+export interface MealSlot {
+  id: string
+  mealType: MealType
+  name: string
+  sortOrder: number
+  options: MealOption[]
+}
+
+export interface DietDay {
+  id: string
+  name: string
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6
+  sortOrder: number
+  meals: Meal[]
+}
+
 export interface WorkoutExercise {
   id: string
   mode: 'library' | 'custom'
@@ -151,6 +176,10 @@ export interface DietPlanContent {
   supplements: SupplementItem[]
   recommendations: string
   notes: string
+  scheduleMode: DietScheduleMode
+  weeklyDays: DietDay[]
+  mealSlots: MealSlot[]
+  /** @deprecated Legacy flat meals — migrated to mealSlots on load */
   meals: Meal[]
 }
 

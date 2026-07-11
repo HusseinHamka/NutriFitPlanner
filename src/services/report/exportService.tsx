@@ -4,7 +4,7 @@ import { fullName } from '@/lib/helpers'
 import type { IExportService } from '@/services/abstractions'
 import type { ReportModel } from '@/types/domain'
 import { PdfReportDocument } from '@/services/report/PdfReportDocument'
-import { clientSummary, planBadgeLabel, trainerNotes } from '@/services/report/reportLayout'
+import { clientSummary, dayTotalCalories, mealTotalCalories, optionTotalCalories, planBadgeLabel, trainerNotes } from '@/services/report/reportLayout'
 
 export class ExportService implements IExportService {
   async exportPdf(model: ReportModel): Promise<Blob> {
@@ -32,15 +32,42 @@ export class ExportService implements IExportService {
         new Paragraph(diet.goals || '—'),
         new Paragraph(`Daily Calories: ${diet.calorieTarget ?? '—'} kcal`),
         new Paragraph(`Water Intake: ${diet.waterIntake || '—'}`),
-        new Paragraph({ text: 'Meal Schedule', heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({
+          text: diet.scheduleMode === 'weekly' ? 'Meal Schedule (Weekly)' : 'Meal Schedule',
+          heading: HeadingLevel.HEADING_2,
+        }),
       )
-      diet.meals.forEach((meal) => {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text: meal.name, bold: true })] }))
-        meal.items.forEach((item) => {
-          paragraphs.push(new Paragraph(`${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal`))
+
+      if (diet.scheduleMode === 'meal_options') {
+        paragraphs.push(new Paragraph('Choose one option per meal.'))
+      }
+
+      if (diet.scheduleMode === 'weekly') {
+        diet.weeklyDays.forEach((day) => {
+          if (!day.meals.length) return
+          paragraphs.push(new Paragraph({ children: [new TextRun({ text: day.name, bold: true })] }))
+          day.meals.forEach((meal) => {
+            paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${meal.name} (${mealTotalCalories(meal)} kcal)`, bold: true })] }))
+            meal.items.filter((item) => item.foodName.trim() || item.quantity != null || item.calories).forEach((item) => {
+              paragraphs.push(new Paragraph(`${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal`))
+            })
+            if (meal.notes) paragraphs.push(new Paragraph(meal.notes))
+          })
+          paragraphs.push(new Paragraph(`Day total: ${dayTotalCalories(day)} kcal`))
         })
-        if (meal.notes) paragraphs.push(new Paragraph(meal.notes))
-      })
+      } else {
+        diet.mealSlots.forEach((slot) => {
+          paragraphs.push(new Paragraph({ children: [new TextRun({ text: slot.name, bold: true })] }))
+          slot.options.forEach((option) => {
+            paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${option.name} (${optionTotalCalories(option)} kcal)`, bold: true })] }))
+            option.items.filter((item) => item.foodName.trim() || item.quantity != null || item.calories).forEach((item) => {
+              paragraphs.push(new Paragraph(`${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal`))
+            })
+            if (option.notes) paragraphs.push(new Paragraph(option.notes))
+          })
+        })
+      }
+
       diet.supplements.forEach((row) => {
         paragraphs.push(new Paragraph(`${row.name} · ${row.dose} · ${row.timing}`))
       })

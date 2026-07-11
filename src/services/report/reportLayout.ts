@@ -1,5 +1,5 @@
 import { calculateAge, formatGender, formatLongDate, fullName } from '@/lib/helpers'
-import type { BusinessSettings, Meal, PlanType, ReportModel } from '@/types/domain'
+import type { BusinessSettings, DietDay, Meal, MealOption, MealSlot, PlanType, ReportModel } from '@/types/domain'
 
 export const REPORT_COLORS = {
   cream: '#F5F0E8',
@@ -21,6 +21,23 @@ export function planBadgeLabel(type: PlanType): string {
 
 export function mealTotalCalories(meal: Meal): number {
   return meal.items.reduce((sum, item) => sum + (item.calories ?? 0), 0)
+}
+
+export function optionTotalCalories(option: MealOption): number {
+  return option.items.reduce((sum, item) => sum + (item.calories ?? 0), 0)
+}
+
+export function dayTotalCalories(day: DietDay): number {
+  return day.meals.reduce((sum, meal) => sum + mealTotalCalories(meal), 0)
+}
+
+export function slotOptionCalorieSummary(slot: MealSlot): string {
+  const totals = slot.options.map((option) => optionTotalCalories(option)).filter((total) => total > 0)
+  if (!totals.length) return 'No calories entered yet'
+  if (totals.length === 1) return `${totals[0]} kcal per option`
+  const min = Math.min(...totals)
+  const max = Math.max(...totals)
+  return min === max ? `${min} kcal per option` : `${min}–${max} kcal across options`
 }
 
 export function trainerNotes(model: ReportModel): string {

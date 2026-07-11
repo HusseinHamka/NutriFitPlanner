@@ -1,15 +1,37 @@
 import { createId } from '@/lib/helpers'
 import type {
+  DietDay,
   DietPlanContent,
+  DietScheduleMode,
   Food,
   Meal,
   MealItem,
+  MealOption,
+  MealSlot,
+  MealType,
   PlanSnapshot,
   SupplementItem,
   WorkoutDay,
   WorkoutExercise,
   WorkoutPlanContent,
 } from '@/types/domain'
+
+export const WEEKDAY_NAMES = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const
+
+export const MEAL_SLOT_DEFS: { mealType: MealType; name: string }[] = [
+  { mealType: 'breakfast', name: 'Breakfast' },
+  { mealType: 'lunch', name: 'Lunch' },
+  { mealType: 'dinner', name: 'Dinner' },
+  { mealType: 'snack', name: 'Snack' },
+]
 
 export function scaleFoodMacros(
   food: Pick<Food, 'calories' | 'protein' | 'carbs' | 'fat' | 'unit'>,
@@ -29,6 +51,15 @@ export function scaleFoodMacros(
 
 export function isMeaningfulMealItem(item: Pick<MealItem, 'foodName' | 'quantity' | 'calories'>): boolean {
   return Boolean(item.foodName.trim() || item.quantity != null || (item.calories != null && item.calories > 0))
+}
+
+export function inferMealTypeFromName(name: string): MealType {
+  const lower = name.toLowerCase()
+  if (lower.includes('breakfast')) return 'breakfast'
+  if (lower.includes('lunch') || lower.includes('launch')) return 'lunch'
+  if (lower.includes('dinner')) return 'dinner'
+  if (lower.includes('snack')) return 'snack'
+  return 'custom'
 }
 
 export function createSupplementItem(sortOrder: number): SupplementItem {
@@ -52,15 +83,93 @@ export function createMealItem(sortOrder: number): MealItem {
   }
 }
 
-export function createMeal(sortOrder: number, name = 'Breakfast'): Meal {
+export function createMeal(sortOrder: number, name = 'Breakfast', mealType: MealType = 'breakfast'): Meal {
   return {
     id: createId(),
     name,
-    mealType: 'breakfast',
+    mealType,
     sortOrder,
     notes: '',
     items: [],
   }
+}
+
+export function createMealOption(name: string, sortOrder: number): MealOption {
+  return {
+    id: createId(),
+    name,
+    sortOrder,
+    notes: '',
+    items: [],
+  }
+}
+
+export function createMealSlot(mealType: MealType, name: string, sortOrder: number): MealSlot {
+  return {
+    id: createId(),
+    mealType,
+    name,
+    sortOrder,
+    options: [createMealOption('Option A', 0)],
+  }
+}
+
+export function createDietDay(dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6, name?: string): DietDay {
+  return {
+    id: createId(),
+    name: name ?? WEEKDAY_NAMES[dayOfWeek],
+    dayOfWeek,
+    sortOrder: dayOfWeek,
+    meals: [],
+  }
+}
+
+export function createEmptyWeeklyDays(): DietDay[] {
+  return WEEKDAY_NAMES.map((name, index) => createDietDay(index as 0 | 1 | 2 | 3 | 4 | 5 | 6, name))
+}
+
+export function createEmptyMealSlots(): MealSlot[] {
+  return MEAL_SLOT_DEFS.map((def, index) => createMealSlot(def.mealType, def.name, index))
+}
+
+export function defaultOptionName(sortOrder: number): string {
+  return `Option ${String.fromCharCode(65 + sortOrder)}`
+}
+
+export function migrateLegacyMealsToMealOptions(meals: Meal[]): MealSlot[] {
+  const grouped = new Map<MealType, Meal[]>()
+
+  for (const meal of meals) {
+    const type =
+      meal.mealType !== 'custom' && meal.mealType !== 'post_workout'
+        ? meal.mealType
+        : inferMealTypeFromName(meal.name)
+    const list = grouped.get(type) ?? []
+    list.push(meal)
+    grouped.set(type, list)
+  }
+
+  return MEAL_SLOT_DEFS.map((def, index) => {
+    const legacyMeals = grouped.get(def.mealType) ?? []
+    const options =
+      legacyMeals.length > 0
+        ? legacyMeals.map((meal, optionIndex) => ({
+            id: meal.id ?? createId(),
+            name: meal.name || defaultOptionName(optionIndex),
+            sortOrder: optionIndex,
+            notes: meal.notes ?? '',
+            items: meal.items,
+          }))
+        : [createMealOption('Option A', 0)]
+
+    return {
+      id: createId(),
+      mealType: def.mealType,
+      name: def.name,
+      sortOrder: index,
+      options,
+    }
+  })
 }
 
 export function createWorkoutExercise(sortOrder: number): WorkoutExercise {
@@ -167,6 +276,48 @@ function normalizeMeal(meal: Partial<Meal>, index: number): Meal {
   }
 }
 
+function normalizeMealOption(option: Partial<MealOption>, index: number): MealOption {
+  const items = Array.isArray(option.items)
+    ? option.items.map(normalizeMealItem).filter(isMeaningfulMealItem)
+    : []
+  return {
+    id: option.id ?? createId(),
+    name: option.name ?? defaultOptionName(index),
+    sortOrder: option.sortOrder ?? index,
+    notes: option.notes ?? '',
+    items,
+  }
+}
+
+function normalizeMealSlot(slot: Partial<MealSlot>, index: number): MealSlot {
+  const def = MEAL_SLOT_DEFS[index] ?? MEAL_SLOT_DEFS[0]
+  const options = Array.isArray(slot.options) && slot.options.length > 0
+    ? slot.options.map(normalizeMealOption)
+    : [createMealOption('Option A', 0)]
+
+  return {
+    id: slot.id ?? createId(),
+    mealType: slot.mealType ?? def.mealType,
+    name: slot.name ?? def.name,
+    sortOrder: slot.sortOrder ?? index,
+    options,
+  }
+}
+
+function normalizeDietDay(day: Partial<DietDay>, index: number): DietDay {
+  const dayOfWeek = (typeof day.dayOfWeek === 'number' && day.dayOfWeek >= 0 && day.dayOfWeek <= 6
+    ? day.dayOfWeek
+    : index) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+
+  return {
+    id: day.id ?? createId(),
+    name: day.name ?? WEEKDAY_NAMES[dayOfWeek],
+    dayOfWeek,
+    sortOrder: day.sortOrder ?? dayOfWeek,
+    meals: Array.isArray(day.meals) ? day.meals.map(normalizeMeal) : [],
+  }
+}
+
 function normalizeWorkoutExercise(exercise: Partial<WorkoutExercise>, index: number): WorkoutExercise {
   return {
     id: exercise.id ?? createId(),
@@ -196,7 +347,7 @@ function normalizeWorkoutDay(day: Partial<WorkoutDay>, index: number): WorkoutDa
 export function normalizeDietContent(diet: Partial<DietPlanContent> | null | undefined): DietPlanContent | null {
   if (!diet) return null
 
-  return {
+  const base = {
     goals: diet.goals ?? '',
     calorieTarget: diet.calorieTarget ?? null,
     proteinTarget: diet.proteinTarget ?? null,
@@ -208,7 +359,44 @@ export function normalizeDietContent(diet: Partial<DietPlanContent> | null | und
     supplements: normalizeSupplements(diet.supplements),
     recommendations: diet.recommendations ?? '',
     notes: diet.notes ?? '',
-    meals: Array.isArray(diet.meals) ? diet.meals.map(normalizeMeal) : [],
+  }
+
+  const legacyMeals = Array.isArray(diet.meals) ? diet.meals.map(normalizeMeal) : []
+  const hasLegacyMeals = legacyMeals.length > 0
+  const explicitMode = diet.scheduleMode === 'weekly' || diet.scheduleMode === 'meal_options'
+    ? diet.scheduleMode
+    : null
+
+  let scheduleMode: DietScheduleMode
+  let weeklyDays: DietDay[]
+  let mealSlots: MealSlot[]
+
+  if (hasLegacyMeals && !explicitMode) {
+    scheduleMode = 'meal_options'
+    mealSlots = migrateLegacyMealsToMealOptions(legacyMeals)
+    weeklyDays = createEmptyWeeklyDays()
+  } else if (explicitMode === 'weekly') {
+    scheduleMode = 'weekly'
+    weeklyDays =
+      Array.isArray(diet.weeklyDays) && diet.weeklyDays.length > 0
+        ? diet.weeklyDays.map(normalizeDietDay)
+        : createEmptyWeeklyDays()
+    mealSlots = createEmptyMealSlots()
+  } else {
+    scheduleMode = 'meal_options'
+    mealSlots =
+      Array.isArray(diet.mealSlots) && diet.mealSlots.length > 0
+        ? diet.mealSlots.map(normalizeMealSlot)
+        : createEmptyMealSlots()
+    weeklyDays = createEmptyWeeklyDays()
+  }
+
+  return {
+    ...base,
+    scheduleMode,
+    weeklyDays,
+    mealSlots,
+    meals: [],
   }
 }
 

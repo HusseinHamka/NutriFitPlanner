@@ -1,3 +1,4 @@
+import { createEmptyMealSlots, createEmptyWeeklyDays } from '@/lib/planSnapshot'
 import type { PlanSnapshot, PlanType } from '@/types/domain'
 
 export function createId(): string {
@@ -77,6 +78,9 @@ export function emptyDietContent() {
     supplements: [],
     recommendations: '',
     notes: '',
+    scheduleMode: 'meal_options' as const,
+    weeklyDays: createEmptyWeeklyDays(),
+    mealSlots: createEmptyMealSlots(),
     meals: [],
   }
 }

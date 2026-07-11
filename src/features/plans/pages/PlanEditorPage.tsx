@@ -29,7 +29,12 @@ import type { PlanSnapshot, PlanStatus } from '@/types/domain'
 import { services } from '@/services/container'
 
 function revisionSummary(snapshot: PlanSnapshot): string {
-  const mealCount = snapshot.diet?.meals.length ?? 0
+  const diet = snapshot.diet
+  const mealCount = diet
+    ? diet.scheduleMode === 'weekly'
+      ? diet.weeklyDays.reduce((sum, day) => sum + day.meals.length, 0)
+      : diet.mealSlots.reduce((sum, slot) => sum + slot.options.length, 0)
+    : 0
   const dayCount = snapshot.workout?.days.length ?? 0
   const parts: string[] = []
   if (mealCount) parts.push(`${mealCount} meal${mealCount === 1 ? '' : 's'}`)

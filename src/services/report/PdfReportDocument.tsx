@@ -9,7 +9,8 @@ import {
 } from '@react-pdf/renderer'
 import { isMeaningfulMealItem } from '@/lib/planSnapshot'
 import { fullName } from '@/lib/helpers'
-import type { ReportModel } from '@/types/domain'
+import { dayTotalCalories, mealTotalCalories, optionTotalCalories } from '@/services/report/reportLayout'
+import type { MealItem, ReportModel } from '@/types/domain'
 import {
   REPORT_COLORS,
   clientSummary,
@@ -327,6 +328,46 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
   )
 }
 
+function PdfMealItemsTable({ items }: { items: MealItem[] }) {
+  const visibleItems = items.filter(isMeaningfulMealItem)
+  if (!visibleItems.length) return null
+
+  return (
+    <>
+      <View style={s.tableHeader}>
+        <Text style={[s.tableHeaderCell, s.colFood]}>Food</Text>
+        <Text style={[s.tableHeaderCell, s.colQty]}>Qty</Text>
+        <Text style={[s.tableHeaderCell, s.colKcal]}>Kcal</Text>
+      </View>
+      {visibleItems.map((item, index) => (
+        <View key={item.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
+          <Text style={[s.tableCell, s.colFood]}>{item.foodName || '—'}</Text>
+          <Text style={[s.tableCell, s.colQty]}>
+            {item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}
+          </Text>
+          <Text style={[s.tableCell, s.colKcal]}>
+            {item.calories != null ? String(item.calories) : '—'}
+          </Text>
+        </View>
+      ))}
+    </>
+  )
+}
+
+function PdfMealCard({ title, subtitle, items, notes }: { title: string; subtitle?: string; items: MealItem[]; notes?: string }) {
+  const visibleItems = items.filter(isMeaningfulMealItem)
+  if (!visibleItems.length && !notes?.trim()) return null
+
+  return (
+    <View style={s.mealCard} wrap={false}>
+      <Text style={s.mealTitle}>{title}</Text>
+      {subtitle ? <Text style={s.mealNote}>{subtitle}</Text> : null}
+      <PdfMealItemsTable items={items} />
+      {notes ? <Text style={s.mealNote}>{notes}</Text> : null}
+    </View>
+  )
+}
+
 function PageFooter({
   model,
   pageNumber,
@@ -431,34 +472,42 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
       {diet ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <SectionHeader icon="◷" title="Meal schedule" />
-          {diet.meals.map((meal) => (
-            <View key={meal.id} style={s.mealCard} wrap={false}>
-              <Text style={s.mealTitle}>{meal.name}</Text>
-              <View style={s.tableHeader}>
-                <Text style={[s.tableHeaderCell, s.colFood]}>Food</Text>
-                <Text style={[s.tableHeaderCell, s.colQty]}>Qty</Text>
-                <Text style={[s.tableHeaderCell, s.colKcal]}>Kcal</Text>
-              </View>
-              {meal.items.filter(isMeaningfulMealItem).map((item, index) => (
-                <View key={item.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-                  <Text style={[s.tableCell, s.colFood]}>{item.foodName || '—'}</Text>
-                  <Text style={[s.tableCell, s.colQty]}>
-                    {item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}
-                  </Text>
-                  <Text style={[s.tableCell, s.colKcal]}>
-                    {item.calories != null ? String(item.calories) : '—'}
-                  </Text>
+          <SectionHeader icon="◷" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
+          {diet.scheduleMode === 'meal_options' ? (
+            <Text style={s.bodyText}>Choose one option per meal.</Text>
+          ) : null}
+          {diet.scheduleMode === 'weekly'
+            ? diet.weeklyDays.map((day) => (
+                day.meals.length > 0 ? (
+                  <View key={day.id} wrap={false}>
+                    <Text style={s.dayTitle}>{day.name}</Text>
+                    {day.meals.map((meal) => (
+                      <PdfMealCard
+                        key={meal.id}
+                        title={meal.name}
+                        subtitle={`${mealTotalCalories(meal)} kcal`}
+                        items={meal.items}
+                        notes={meal.notes}
+                      />
+                    ))}
+                    <Text style={s.mealNote}>Day total: {dayTotalCalories(day)} kcal</Text>
+                  </View>
+                ) : null
+              ))
+            : diet.mealSlots.map((slot) => (
+                <View key={slot.id} wrap={false}>
+                  <Text style={s.dayTitle}>{slot.name}</Text>
+                  {slot.options.map((option) => (
+                    <PdfMealCard
+                      key={option.id}
+                      title={option.name}
+                      subtitle={`${optionTotalCalories(option)} kcal`}
+                      items={option.items}
+                      notes={option.notes}
+                    />
+                  ))}
                 </View>
               ))}
-              {meal.items.filter(isMeaningfulMealItem).length === 0 ? (
-                <View style={s.tableRow}>
-                  <Text style={[s.tableCell, s.colFood]}>No items added</Text>
-                </View>
-              ) : null}
-              {meal.notes ? <Text style={s.mealNote}>{meal.notes}</Text> : null}
-            </View>
-          ))}
 
           {supplements.length > 0 ? (
             <>
