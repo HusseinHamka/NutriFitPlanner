@@ -19,6 +19,7 @@ import {
   practitionerSubtitle,
   trainerNotes,
 } from '@/services/report/reportLayout'
+import { PdfBrandMark, PdfSectionIcon, type PdfReportIconKind } from '@/services/report/pdfIcons'
 
 Font.register({
   family: 'Lora',
@@ -72,7 +73,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoMark: { color: '#FFFFFF', fontSize: 14, fontFamily: 'Lora' },
   practitionerName: { fontFamily: 'Lora', fontSize: 18, color: REPORT_COLORS.deepForest },
   preparedByCaption: {
     fontSize: 7,
@@ -151,7 +151,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
-  sectionIconText: { color: '#FFFFFF', fontSize: 9 },
   sectionTitle: { fontFamily: 'Lora', fontSize: 14, color: REPORT_COLORS.deepForest },
   sectionLine: {
     flex: 1,
@@ -316,11 +315,11 @@ const s = StyleSheet.create({
   colSupTiming: { width: '30%' },
 })
 
-function SectionHeader({ icon, title }: { icon: string; title: string }) {
+function SectionHeader({ icon, title }: { icon: PdfReportIconKind; title: string }) {
   return (
     <View style={s.sectionHeader}>
       <View style={s.sectionIcon}>
-        <Text style={s.sectionIconText}>{icon}</Text>
+        <PdfSectionIcon kind={icon} />
       </View>
       <Text style={s.sectionTitle}>{title}</Text>
       <View style={s.sectionLine} />
@@ -395,7 +394,7 @@ function ReportHeader({ model }: { model: ReportModel }) {
             <Image src={model.business.logoUrl} style={{ width: 34, height: 34, borderRadius: 17 }} />
           ) : (
             <View style={s.logoCircle}>
-              <Text style={s.logoMark}>✿</Text>
+              <PdfBrandMark />
             </View>
           )}
           <View>
@@ -449,7 +448,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
 
         {diet ? (
           <>
-            <SectionHeader icon="◆" title="Nutrition goals" />
+            <SectionHeader icon="nutrition" title="Nutrition goals" />
             <Text style={s.bodyText}>{diet.goals || '—'}</Text>
             <View style={s.metricRow}>
               <View style={s.metricCard}>
@@ -472,7 +471,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
       {diet ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <SectionHeader icon="◷" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
+          <SectionHeader icon="schedule" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
           {diet.scheduleMode === 'meal_options' ? (
             <Text style={s.bodyText}>Choose one option per meal.</Text>
           ) : null}
@@ -511,7 +510,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
 
           {supplements.length > 0 ? (
             <>
-              <SectionHeader icon="✦" title="Supplements" />
+              <SectionHeader icon="star" title="Supplements" />
               <View style={s.mealCard} wrap={false}>
                 <View style={s.tableHeader}>
                   <Text style={[s.tableHeaderCell, s.colSupName]}>Name</Text>
@@ -549,7 +548,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
                 <Text style={s.badgeText}>Training</Text>
               </View>
               <Text style={s.trainingTitle}>Weekly Training Plan</Text>
-              <SectionHeader icon="✦" title="Goals" />
+              <SectionHeader icon="star" title="Goals" />
               <Text style={s.bodyText}>{workout.goals || '—'}</Text>
             </>
           ) : null}
@@ -561,7 +560,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
       {workout ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <SectionHeader icon="◷" title="Weekly schedule" />
+          <SectionHeader icon="schedule" title="Weekly schedule" />
           <View style={s.scheduleRow}>
             {workout.days.map((day) => (
               <View key={day.id} style={s.schedulePill}>
@@ -570,7 +569,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
             ))}
           </View>
 
-          <SectionHeader icon="⚖" title="Training sessions" />
+          <SectionHeader icon="training" title="Training sessions" />
           {workout.days.map((day) => (
             <View key={day.id} style={s.dayCard} wrap={false}>
               <View style={s.dayHeader}>
@@ -598,7 +597,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
             </View>
           ))}
 
-          <SectionHeader icon="◴" title="Session structure" />
+          <SectionHeader icon="session" title="Session structure" />
           {[
             { label: 'Warm-up', value: workout.warmup },
             { label: 'Cool-down', value: workout.cooldown },

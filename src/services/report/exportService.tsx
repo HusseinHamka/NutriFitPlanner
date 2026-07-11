@@ -4,11 +4,13 @@ import { fullName } from '@/lib/helpers'
 import type { IExportService } from '@/services/abstractions'
 import type { ReportModel } from '@/types/domain'
 import { PdfReportDocument } from '@/services/report/PdfReportDocument'
+import { prepareReportModelForPdf } from '@/services/report/resolvePdfAssets'
 import { clientSummary, dayTotalCalories, mealTotalCalories, optionTotalCalories, planBadgeLabel, trainerNotes } from '@/services/report/reportLayout'
 
 export class ExportService implements IExportService {
   async exportPdf(model: ReportModel): Promise<Blob> {
-    return pdf(<PdfReportDocument model={model} />).toBlob()
+    const pdfModel = await prepareReportModelForPdf(model)
+    return pdf(<PdfReportDocument model={pdfModel} />).toBlob()
   }
 
   async exportDocx(model: ReportModel): Promise<Blob> {
