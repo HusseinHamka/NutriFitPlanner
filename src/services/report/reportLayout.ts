@@ -1,5 +1,16 @@
 import { calculateAge, formatGender, formatLongDate, fullName } from '@/lib/helpers'
-import type { BusinessSettings, DietDay, Meal, MealOption, MealSlot, PlanType, ReportModel } from '@/types/domain'
+import { isMeaningfulMealItem } from '@/lib/planSnapshot'
+import type {
+  BusinessSettings,
+  DietDay,
+  DietPlanContent,
+  Meal,
+  MealOption,
+  MealSlot,
+  PlanType,
+  ReportModel,
+  WorkoutPlanContent,
+} from '@/types/domain'
 
 export const REPORT_COLORS = {
   cream: '#F5F0E8',
@@ -68,4 +79,59 @@ export function formatWaterIntake(value: string): string {
   const normalized = value.trim()
   if (/ml|l|liter|litre|cup|glass/i.test(normalized)) return normalized
   return `${normalized} ml/day`
+}
+
+function mealHasContent(meal: Meal): boolean {
+  return meal.items.some(isMeaningfulMealItem) || meal.notes.trim().length > 0
+}
+
+function optionHasContent(option: MealOption): boolean {
+  return option.items.some(isMeaningfulMealItem) || option.notes.trim().length > 0
+}
+
+/** Nutrition goals block: goals text or any target metric. */
+export function hasNutritionGoals(diet: DietPlanContent): boolean {
+  return diet.goals.trim().length > 0 || diet.calorieTarget != null || diet.waterIntake.trim().length > 0
+}
+
+/** Meal schedule block: at least one meal/option carries real data. */
+export function hasMealSchedule(diet: DietPlanContent): boolean {
+  if (diet.scheduleMode === 'weekly') {
+    return diet.weeklyDays.some((day) => day.meals.some(mealHasContent))
+  }
+  return diet.mealSlots.some((slot) => slot.options.some(optionHasContent))
+}
+
+export function dietDayHasContent(day: DietDay): boolean {
+  return day.meals.some(mealHasContent)
+}
+
+export function mealSlotHasContent(slot: MealSlot): boolean {
+  return slot.options.some(optionHasContent)
+}
+
+export function hasWorkoutGoals(workout: WorkoutPlanContent): boolean {
+  return workout.goals.trim().length > 0
+}
+
+export function hasWorkoutSchedule(workout: WorkoutPlanContent): boolean {
+  return workout.days.length > 0
+}
+
+export function hasWorkoutSessions(workout: WorkoutPlanContent): boolean {
+  return workout.days.some((day) => day.exercises.some((exercise) => exercise.exerciseName.trim().length > 0))
+}
+
+export function hasWorkoutStructure(workout: WorkoutPlanContent): boolean {
+  return workout.warmup.trim().length > 0 || workout.cooldown.trim().length > 0 || workout.cardio.trim().length > 0
+}
+
+/** Whether the workout carries any renderable content across all sections. */
+export function hasWorkoutContent(workout: WorkoutPlanContent): boolean {
+  return (
+    hasWorkoutGoals(workout) ||
+    hasWorkoutSchedule(workout) ||
+    hasWorkoutSessions(workout) ||
+    hasWorkoutStructure(workout)
+  )
 }

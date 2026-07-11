@@ -4,7 +4,16 @@ import {
   REPORT_COLORS,
   clientSummary,
   dayTotalCalories,
+  dietDayHasContent,
   formatWaterIntake,
+  hasMealSchedule,
+  hasNutritionGoals,
+  hasWorkoutContent,
+  hasWorkoutGoals,
+  hasWorkoutSchedule,
+  hasWorkoutSessions,
+  hasWorkoutStructure,
+  mealSlotHasContent,
   mealTotalCalories,
   optionTotalCalories,
   planBadgeLabel,
@@ -106,6 +115,22 @@ export function ReportRenderer({ model }: ReportRendererProps) {
   const notes = trainerNotes(model)
   const titleLine = practitionerSubtitle(model.business)
 
+  const showNutritionGoals = diet != null && hasNutritionGoals(diet)
+  const showMealSchedule = diet != null && hasMealSchedule(diet)
+  const showRecommendations = diet != null && diet.recommendations.trim().length > 0
+  const showDietNotes = diet != null && diet.notes.trim().length > 0
+
+  const workoutContent = workout != null && hasWorkoutContent(workout)
+  const showWorkoutGoals = workout != null && hasWorkoutGoals(workout)
+  const showWorkoutSchedule = workout != null && hasWorkoutSchedule(workout)
+  const showWorkoutSessions = workout != null && hasWorkoutSessions(workout)
+  const showWorkoutStructure = workout != null && hasWorkoutStructure(workout)
+
+  const showDietPage =
+    diet != null &&
+    (showMealSchedule || supplements.length > 0 || showRecommendations || showDietNotes || workoutContent)
+  const showWorkoutPage = workout != null && (showWorkoutSchedule || showWorkoutSessions || showWorkoutStructure)
+
   const pageClass = 'rounded-[var(--radius)] p-8 shadow-sm [break-after:page]'
 
   return (
@@ -178,62 +203,70 @@ export function ReportRenderer({ model }: ReportRendererProps) {
           ))}
         </div>
 
-        {diet ? (
+        {diet && showNutritionGoals ? (
           <div className="mt-6">
             <SectionHeader icon="◆" title="Nutrition goals" />
-            <p className="mb-4 text-sm">{diet.goals || '—'}</p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Daily Calories</p>
-                <p className="font-heading text-2xl" style={{ color: REPORT_COLORS.deepForest }}>
-                  {diet.calorieTarget != null ? `${diet.calorieTarget} kcal` : '—'}
-                </p>
+            {diet.goals.trim() ? <p className="mb-4 text-sm">{diet.goals}</p> : null}
+            {diet.calorieTarget != null || diet.waterIntake.trim() ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {diet.calorieTarget != null ? (
+                  <div className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Daily Calories</p>
+                    <p className="font-heading text-2xl" style={{ color: REPORT_COLORS.deepForest }}>
+                      {`${diet.calorieTarget} kcal`}
+                    </p>
+                  </div>
+                ) : null}
+                {diet.waterIntake.trim() ? (
+                  <div className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Water Intake</p>
+                    <p className="font-heading text-2xl" style={{ color: REPORT_COLORS.deepForest }}>
+                      {formatWaterIntake(diet.waterIntake)}
+                    </p>
+                  </div>
+                ) : null}
               </div>
-              <div className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Water Intake</p>
-                <p className="font-heading text-2xl" style={{ color: REPORT_COLORS.deepForest }}>
-                  {formatWaterIntake(diet.waterIntake)}
-                </p>
-              </div>
-            </div>
+            ) : null}
           </div>
         ) : null}
       </section>
 
       {/* Page 2 - Diet details */}
-      {diet ? (
+      {diet && showDietPage ? (
         <section className={pageClass} style={{ backgroundColor: REPORT_COLORS.cream }}>
-          <SectionHeader icon="◷" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
-          {diet.scheduleMode === 'meal_options' ? (
-            <p className="mb-4 rounded-[var(--radius)] border px-3 py-2 text-sm" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-              Choose one option per meal.
-            </p>
-          ) : null}
-          <div className="space-y-4">
-            {diet.scheduleMode === 'weekly'
-              ? diet.weeklyDays.map((day) => (
-                  day.meals.length > 0 ? (
-                    <div key={day.id} className="space-y-3">
-                      <WeeklyMealSchedule meals={day.meals} dayName={day.name} />
-                      <p className="text-sm text-muted-foreground">Day total: {dayTotalCalories(day)} kcal</p>
-                    </div>
-                  ) : null
-                ))
-              : diet.mealSlots.map((slot) => (
-                  <div key={slot.id} className="space-y-3">
-                    <p className="font-heading text-lg" style={{ color: REPORT_COLORS.deepForest }}>{slot.name}</p>
-                    {slot.options.map((option) => (
-                      <MealCard
-                        key={option.id}
-                        title={option.name}
-                        subtitle={`${optionTotalCalories(option)} kcal`}
-                        items={option.items}
-                        notes={option.notes}
-                      />
+          {showMealSchedule ? (
+            <>
+              <SectionHeader icon="◷" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
+              {diet.scheduleMode === 'meal_options' ? (
+                <p className="mb-4 rounded-[var(--radius)] border px-3 py-2 text-sm" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+                  Choose one option per meal.
+                </p>
+              ) : null}
+              <div className="space-y-4">
+                {diet.scheduleMode === 'weekly'
+                  ? diet.weeklyDays.filter(dietDayHasContent).map((day) => (
+                      <div key={day.id} className="space-y-3">
+                        <WeeklyMealSchedule meals={day.meals} dayName={day.name} />
+                        <p className="text-sm text-muted-foreground">Day total: {dayTotalCalories(day)} kcal</p>
+                      </div>
+                    ))
+                  : diet.mealSlots.filter(mealSlotHasContent).map((slot) => (
+                      <div key={slot.id} className="space-y-3">
+                        <p className="font-heading text-lg" style={{ color: REPORT_COLORS.deepForest }}>{slot.name}</p>
+                        {slot.options.map((option) => (
+                          <MealCard
+                            key={option.id}
+                            title={option.name}
+                            subtitle={`${optionTotalCalories(option)} kcal`}
+                            items={option.items}
+                            notes={option.notes}
+                          />
+                        ))}
+                      </div>
                     ))}
-                  </div>
-                ))}
-          </div>
+              </div>
+            </>
+          ) : null}
 
           {supplements.length > 0 ? (
             <div className="mt-6">
@@ -255,94 +288,114 @@ export function ReportRenderer({ model }: ReportRendererProps) {
             </div>
           ) : null}
 
-          {diet.recommendations ? (
+          {showRecommendations ? (
             <div className="mt-4 rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
               <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Recommendations</p>
               <p className="mt-2 text-sm">{diet.recommendations}</p>
             </div>
           ) : null}
 
-          {diet.notes ? (
+          {showDietNotes ? (
             <div className="mt-4 rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
               <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>Notes</p>
               <p className="mt-2 text-sm">{diet.notes}</p>
             </div>
           ) : null}
 
-          {workout ? (
+          {workout && workoutContent ? (
             <div className="mt-8">
               <span className="inline-block rounded-full px-3 py-1 text-[10px] font-semibold uppercase" style={{ backgroundColor: REPORT_COLORS.softSage, color: REPORT_COLORS.deepForest }}>
                 Training
               </span>
               <h3 className="mt-3 font-heading text-2xl" style={{ color: REPORT_COLORS.deepForest }}>Weekly Training Plan</h3>
-              <SectionHeader icon="✦" title="Goals" />
-              <p className="text-sm">{workout.goals || '—'}</p>
+              {showWorkoutGoals ? (
+                <>
+                  <SectionHeader icon="✦" title="Goals" />
+                  <p className="text-sm">{workout.goals}</p>
+                </>
+              ) : null}
             </div>
           ) : null}
         </section>
       ) : null}
 
       {/* Page 3 - Workout */}
-      {workout ? (
+      {workout && showWorkoutPage ? (
         <section className={pageClass} style={{ backgroundColor: REPORT_COLORS.cream }}>
-          <SectionHeader icon="◷" title="Weekly schedule" />
-          <div className="mb-6 flex flex-wrap gap-2">
-            {workout.days.map((day) => (
-              <span key={day.id} className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: REPORT_COLORS.sageLight }}>
-                {day.name}
-              </span>
-            ))}
-          </div>
-
-          <SectionHeader icon="⚖" title="Training sessions" />
-          <div className="space-y-4">
-            {workout.days.map((day) => (
-              <div key={day.id} className="overflow-hidden rounded-[var(--radius)] border" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-                <div className="flex items-center justify-between border-b px-4 py-2" style={{ borderColor: REPORT_COLORS.border }}>
-                  <p className="font-heading text-base" style={{ color: REPORT_COLORS.deepForest }}>{day.name}</p>
-                  {day.muscleGroups.trim() ? (
-                    <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>{day.muscleGroups}</p>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr] gap-2 px-4 py-2 text-[10px] font-bold uppercase" style={{ backgroundColor: REPORT_COLORS.softSage }}>
-                  <span>Exercise</span>
-                  <span>Sets</span>
-                  <span>Reps</span>
-                  <span>Rest</span>
-                  <span>Notes</span>
-                </div>
-                {day.exercises.map((exercise, index) => (
-                  <div
-                    key={exercise.id}
-                    className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr] gap-2 border-t px-4 py-2 text-sm"
-                    style={{ borderColor: REPORT_COLORS.border, backgroundColor: index % 2 === 1 ? REPORT_COLORS.sageLight : REPORT_COLORS.paper }}
-                  >
-                    <span>{exercise.exerciseName || '—'}</span>
-                    <span>{exercise.sets ?? '—'}</span>
-                    <span>{exercise.reps || '—'}</span>
-                    <span>{exercise.rest || '—'}</span>
-                    <span>{exercise.notes || '—'}</span>
-                  </div>
+          {showWorkoutSchedule ? (
+            <>
+              <SectionHeader icon="◷" title="Weekly schedule" />
+              <div className="mb-6 flex flex-wrap gap-2">
+                {workout.days.map((day) => (
+                  <span key={day.id} className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: REPORT_COLORS.sageLight }}>
+                    {day.name}
+                  </span>
                 ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : null}
 
-          <div className="mt-6">
-            <SectionHeader icon="◴" title="Session structure" />
-            <div className="space-y-3">
-              {[
-                { label: 'Warm-up', value: workout.warmup },
-                { label: 'Cool-down', value: workout.cooldown },
-                { label: 'Cardio', value: workout.cardio },
-              ].map((item) => (
-                <div key={item.label} className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>{item.label}</p>
-                  <p className="mt-2 text-sm">{item.value || '—'}</p>
-                </div>
-              ))}
+          {showWorkoutSessions ? (
+            <>
+              <SectionHeader icon="⚖" title="Training sessions" />
+              <div className="space-y-4">
+                {workout.days
+                  .filter((day) => day.exercises.some((exercise) => exercise.exerciseName.trim().length > 0))
+                  .map((day) => (
+                    <div key={day.id} className="overflow-hidden rounded-[var(--radius)] border" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+                      <div className="flex items-center justify-between border-b px-4 py-2" style={{ borderColor: REPORT_COLORS.border }}>
+                        <p className="font-heading text-base" style={{ color: REPORT_COLORS.deepForest }}>{day.name}</p>
+                        {day.muscleGroups.trim() ? (
+                          <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>{day.muscleGroups}</p>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr] gap-2 px-4 py-2 text-[10px] font-bold uppercase" style={{ backgroundColor: REPORT_COLORS.softSage }}>
+                        <span>Exercise</span>
+                        <span>Sets</span>
+                        <span>Reps</span>
+                        <span>Rest</span>
+                        <span>Notes</span>
+                      </div>
+                      {day.exercises
+                        .filter((exercise) => exercise.exerciseName.trim().length > 0)
+                        .map((exercise, index) => (
+                          <div
+                            key={exercise.id}
+                            className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr] gap-2 border-t px-4 py-2 text-sm"
+                            style={{ borderColor: REPORT_COLORS.border, backgroundColor: index % 2 === 1 ? REPORT_COLORS.sageLight : REPORT_COLORS.paper }}
+                          >
+                            <span>{exercise.exerciseName || '—'}</span>
+                            <span>{exercise.sets ?? '—'}</span>
+                            <span>{exercise.reps || '—'}</span>
+                            <span>{exercise.rest || '—'}</span>
+                            <span>{exercise.notes || '—'}</span>
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : null}
+
+          {showWorkoutStructure ? (
+            <div className="mt-6">
+              <SectionHeader icon="◴" title="Session structure" />
+              <div className="space-y-3">
+                {[
+                  { label: 'Warm-up', value: workout.warmup },
+                  { label: 'Cool-down', value: workout.cooldown },
+                  { label: 'Cardio', value: workout.cardio },
+                ]
+                  .filter((item) => item.value.trim().length > 0)
+                  .map((item) => (
+                    <div key={item.label} className="rounded-[var(--radius)] border p-4" style={{ borderColor: REPORT_COLORS.border, backgroundColor: REPORT_COLORS.paper }}>
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: REPORT_COLORS.muted }}>{item.label}</p>
+                      <p className="mt-2 text-sm">{item.value}</p>
+                    </div>
+                  ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
       ) : null}
 

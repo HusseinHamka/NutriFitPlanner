@@ -14,7 +14,16 @@ import type { MealItem, ReportModel } from '@/types/domain'
 import {
   REPORT_COLORS,
   clientSummary,
+  dietDayHasContent,
   formatWaterIntake,
+  hasMealSchedule,
+  hasNutritionGoals,
+  hasWorkoutContent,
+  hasWorkoutGoals,
+  hasWorkoutSchedule,
+  hasWorkoutSessions,
+  hasWorkoutStructure,
+  mealSlotHasContent,
   planBadgeLabel,
   practitionerSubtitle,
   trainerNotes,
@@ -421,6 +430,22 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
   const notes = trainerNotes(model)
   let pageNumber = 1
 
+  const showNutritionGoals = diet != null && hasNutritionGoals(diet)
+  const showMealSchedule = diet != null && hasMealSchedule(diet)
+  const showRecommendations = diet != null && diet.recommendations.trim().length > 0
+  const showDietNotes = diet != null && diet.notes.trim().length > 0
+
+  const workoutContent = workout != null && hasWorkoutContent(workout)
+  const showWorkoutGoals = workout != null && hasWorkoutGoals(workout)
+  const showWorkoutSchedule = workout != null && hasWorkoutSchedule(workout)
+  const showWorkoutSessions = workout != null && hasWorkoutSessions(workout)
+  const showWorkoutStructure = workout != null && hasWorkoutStructure(workout)
+
+  const showDietPage =
+    diet != null &&
+    (showMealSchedule || supplements.length > 0 || showRecommendations || showDietNotes || workoutContent)
+  const showWorkoutPage = workout != null && (showWorkoutSchedule || showWorkoutSessions || showWorkoutStructure)
+
   return (
     <Document>
       <Page size="A4" style={s.page}>
@@ -446,67 +471,73 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
           ))}
         </View>
 
-        {diet ? (
+        {diet && showNutritionGoals ? (
           <>
             <SectionHeader icon="nutrition" title="Nutrition goals" />
-            <Text style={s.bodyText}>{diet.goals || '—'}</Text>
-            <View style={s.metricRow}>
-              <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Daily Calories</Text>
-                <Text style={s.metricValue}>
-                  {diet.calorieTarget != null ? `${diet.calorieTarget} kcal` : '—'}
-                </Text>
+            {diet.goals.trim() ? <Text style={s.bodyText}>{diet.goals}</Text> : null}
+            {diet.calorieTarget != null || diet.waterIntake.trim() ? (
+              <View style={s.metricRow}>
+                {diet.calorieTarget != null ? (
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Daily Calories</Text>
+                    <Text style={s.metricValue}>{`${diet.calorieTarget} kcal`}</Text>
+                  </View>
+                ) : null}
+                {diet.waterIntake.trim() ? (
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Water Intake</Text>
+                    <Text style={s.metricValue}>{formatWaterIntake(diet.waterIntake)}</Text>
+                  </View>
+                ) : null}
               </View>
-              <View style={s.metricCard}>
-                <Text style={s.metricLabel}>Water Intake</Text>
-                <Text style={s.metricValue}>{formatWaterIntake(diet.waterIntake)}</Text>
-              </View>
-            </View>
+            ) : null}
           </>
         ) : null}
 
         <PageFooter model={model} pageNumber={pageNumber} />
       </Page>
 
-      {diet ? (
+      {diet && showDietPage ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <SectionHeader icon="schedule" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
-          {diet.scheduleMode === 'meal_options' ? (
-            <Text style={s.bodyText}>Choose one option per meal.</Text>
-          ) : null}
-          {diet.scheduleMode === 'weekly'
-            ? diet.weeklyDays.map((day) => (
-                day.meals.length > 0 ? (
-                  <View key={day.id} wrap={false}>
-                    <Text style={s.dayTitle}>{day.name}</Text>
-                    {day.meals.map((meal) => (
-                      <PdfMealCard
-                        key={meal.id}
-                        title={meal.name}
-                        subtitle={`${mealTotalCalories(meal)} kcal`}
-                        items={meal.items}
-                        notes={meal.notes}
-                      />
-                    ))}
-                    <Text style={s.mealNote}>Day total: {dayTotalCalories(day)} kcal</Text>
-                  </View>
-                ) : null
-              ))
-            : diet.mealSlots.map((slot) => (
-                <View key={slot.id} wrap={false}>
-                  <Text style={s.dayTitle}>{slot.name}</Text>
-                  {slot.options.map((option) => (
-                    <PdfMealCard
-                      key={option.id}
-                      title={option.name}
-                      subtitle={`${optionTotalCalories(option)} kcal`}
-                      items={option.items}
-                      notes={option.notes}
-                    />
+          {showMealSchedule ? (
+            <>
+              <SectionHeader icon="schedule" title={diet.scheduleMode === 'weekly' ? 'Meal schedule (Weekly)' : 'Meal schedule'} />
+              {diet.scheduleMode === 'meal_options' ? (
+                <Text style={s.bodyText}>Choose one option per meal.</Text>
+              ) : null}
+              {diet.scheduleMode === 'weekly'
+                ? diet.weeklyDays.filter(dietDayHasContent).map((day) => (
+                    <View key={day.id} wrap={false}>
+                      <Text style={s.dayTitle}>{day.name}</Text>
+                      {day.meals.map((meal) => (
+                        <PdfMealCard
+                          key={meal.id}
+                          title={meal.name}
+                          subtitle={`${mealTotalCalories(meal)} kcal`}
+                          items={meal.items}
+                          notes={meal.notes}
+                        />
+                      ))}
+                      <Text style={s.mealNote}>Day total: {dayTotalCalories(day)} kcal</Text>
+                    </View>
+                  ))
+                : diet.mealSlots.filter(mealSlotHasContent).map((slot) => (
+                    <View key={slot.id} wrap={false}>
+                      <Text style={s.dayTitle}>{slot.name}</Text>
+                      {slot.options.map((option) => (
+                        <PdfMealCard
+                          key={option.id}
+                          title={option.name}
+                          subtitle={`${optionTotalCalories(option)} kcal`}
+                          items={option.items}
+                          notes={option.notes}
+                        />
+                      ))}
+                    </View>
                   ))}
-                </View>
-              ))}
+            </>
+          ) : null}
 
           {supplements.length > 0 ? (
             <>
@@ -528,28 +559,32 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
             </>
           ) : null}
 
-          {diet.recommendations ? (
+          {showRecommendations ? (
             <View style={s.infoBox}>
               <Text style={s.infoBoxLabel}>Recommendations</Text>
               <Text style={s.bodyText}>{diet.recommendations}</Text>
             </View>
           ) : null}
 
-          {diet.notes ? (
+          {showDietNotes ? (
             <View style={s.infoBox}>
               <Text style={s.infoBoxLabel}>Notes</Text>
               <Text style={s.bodyText}>{diet.notes}</Text>
             </View>
           ) : null}
 
-          {workout ? (
+          {workout && workoutContent ? (
             <>
               <View style={s.trainingBadge}>
                 <Text style={s.badgeText}>Training</Text>
               </View>
               <Text style={s.trainingTitle}>Weekly Training Plan</Text>
-              <SectionHeader icon="star" title="Goals" />
-              <Text style={s.bodyText}>{workout.goals || '—'}</Text>
+              {showWorkoutGoals ? (
+                <>
+                  <SectionHeader icon="star" title="Goals" />
+                  <Text style={s.bodyText}>{workout.goals}</Text>
+                </>
+              ) : null}
             </>
           ) : null}
 
@@ -557,57 +592,75 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
         </Page>
       ) : null}
 
-      {workout ? (
+      {workout && showWorkoutPage ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <SectionHeader icon="schedule" title="Weekly schedule" />
-          <View style={s.scheduleRow}>
-            {workout.days.map((day) => (
-              <View key={day.id} style={s.schedulePill}>
-                <Text style={s.schedulePillText}>{day.name}</Text>
+          {showWorkoutSchedule ? (
+            <>
+              <SectionHeader icon="schedule" title="Weekly schedule" />
+              <View style={s.scheduleRow}>
+                {workout.days.map((day) => (
+                  <View key={day.id} style={s.schedulePill}>
+                    <Text style={s.schedulePillText}>{day.name}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          ) : null}
 
-          <SectionHeader icon="training" title="Training sessions" />
-          {workout.days.map((day) => (
-            <View key={day.id} style={s.dayCard} wrap={false}>
-              <View style={s.dayHeader}>
-                <Text style={s.dayTitle}>{day.name}</Text>
-                {day.muscleGroups.trim() ? (
-                  <Text style={s.daySubtitle}>{day.muscleGroups.toUpperCase()}</Text>
-                ) : null}
-              </View>
-              <View style={s.tableHeader}>
-                <Text style={[s.tableHeaderCell, s.colExercise]}>Exercise</Text>
-                <Text style={[s.tableHeaderCell, s.colSets]}>Sets</Text>
-                <Text style={[s.tableHeaderCell, s.colReps]}>Reps</Text>
-                <Text style={[s.tableHeaderCell, s.colRest]}>Rest</Text>
-                <Text style={[s.tableHeaderCell, s.colNotes]}>Notes</Text>
-              </View>
-              {day.exercises.map((exercise, index) => (
-                <View key={exercise.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-                  <Text style={[s.tableCell, s.colExercise]}>{exercise.exerciseName || '—'}</Text>
-                  <Text style={[s.tableCell, s.colSets]}>{exercise.sets ?? '—'}</Text>
-                  <Text style={[s.tableCell, s.colReps]}>{exercise.reps || '—'}</Text>
-                  <Text style={[s.tableCell, s.colRest]}>{exercise.rest || '—'}</Text>
-                  <Text style={[s.tableCell, s.colNotes]}>{exercise.notes || '—'}</Text>
-                </View>
-              ))}
-            </View>
-          ))}
+          {showWorkoutSessions ? (
+            <>
+              <SectionHeader icon="training" title="Training sessions" />
+              {workout.days
+                .filter((day) => day.exercises.some((exercise) => exercise.exerciseName.trim().length > 0))
+                .map((day) => (
+                  <View key={day.id} style={s.dayCard} wrap={false}>
+                    <View style={s.dayHeader}>
+                      <Text style={s.dayTitle}>{day.name}</Text>
+                      {day.muscleGroups.trim() ? (
+                        <Text style={s.daySubtitle}>{day.muscleGroups.toUpperCase()}</Text>
+                      ) : null}
+                    </View>
+                    <View style={s.tableHeader}>
+                      <Text style={[s.tableHeaderCell, s.colExercise]}>Exercise</Text>
+                      <Text style={[s.tableHeaderCell, s.colSets]}>Sets</Text>
+                      <Text style={[s.tableHeaderCell, s.colReps]}>Reps</Text>
+                      <Text style={[s.tableHeaderCell, s.colRest]}>Rest</Text>
+                      <Text style={[s.tableHeaderCell, s.colNotes]}>Notes</Text>
+                    </View>
+                    {day.exercises
+                      .filter((exercise) => exercise.exerciseName.trim().length > 0)
+                      .map((exercise, index) => (
+                        <View key={exercise.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
+                          <Text style={[s.tableCell, s.colExercise]}>{exercise.exerciseName || '—'}</Text>
+                          <Text style={[s.tableCell, s.colSets]}>{exercise.sets ?? '—'}</Text>
+                          <Text style={[s.tableCell, s.colReps]}>{exercise.reps || '—'}</Text>
+                          <Text style={[s.tableCell, s.colRest]}>{exercise.rest || '—'}</Text>
+                          <Text style={[s.tableCell, s.colNotes]}>{exercise.notes || '—'}</Text>
+                        </View>
+                      ))}
+                  </View>
+                ))}
+            </>
+          ) : null}
 
-          <SectionHeader icon="session" title="Session structure" />
-          {[
-            { label: 'Warm-up', value: workout.warmup },
-            { label: 'Cool-down', value: workout.cooldown },
-            { label: 'Cardio', value: workout.cardio },
-          ].map((item) => (
-            <View key={item.label} style={s.sessionCard}>
-              <Text style={s.infoBoxLabel}>{item.label}</Text>
-              <Text style={s.bodyText}>{item.value || '—'}</Text>
-            </View>
-          ))}
+          {showWorkoutStructure ? (
+            <>
+              <SectionHeader icon="session" title="Session structure" />
+              {[
+                { label: 'Warm-up', value: workout.warmup },
+                { label: 'Cool-down', value: workout.cooldown },
+                { label: 'Cardio', value: workout.cardio },
+              ]
+                .filter((item) => item.value.trim().length > 0)
+                .map((item) => (
+                  <View key={item.label} style={s.sessionCard}>
+                    <Text style={s.infoBoxLabel}>{item.label}</Text>
+                    <Text style={s.bodyText}>{item.value}</Text>
+                  </View>
+                ))}
+            </>
+          ) : null}
 
           <PageFooter model={model} pageNumber={++pageNumber} />
         </Page>
