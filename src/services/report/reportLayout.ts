@@ -85,6 +85,14 @@ function mealHasContent(meal: Meal): boolean {
   return meal.items.some(isMeaningfulMealItem) || meal.notes.trim().length > 0
 }
 
+export function mealHasReportContent(meal: Meal): boolean {
+  return mealHasContent(meal)
+}
+
+export function optionHasReportContent(option: MealOption): boolean {
+  return optionHasContent(option)
+}
+
 function optionHasContent(option: MealOption): boolean {
   return option.items.some(isMeaningfulMealItem) || option.notes.trim().length > 0
 }
@@ -123,7 +131,11 @@ export function hasWorkoutSessions(workout: WorkoutPlanContent): boolean {
 }
 
 export function hasWorkoutStructure(workout: WorkoutPlanContent): boolean {
-  return workout.warmup.trim().length > 0 || workout.cooldown.trim().length > 0 || workout.cardio.trim().length > 0
+  const meaningful = (value: string) => {
+    const trimmed = value.trim()
+    return trimmed.length > 0 && trimmed !== '-'
+  }
+  return meaningful(workout.warmup) || meaningful(workout.cooldown) || meaningful(workout.cardio)
 }
 
 /** Whether the workout carries any renderable content across all sections. */

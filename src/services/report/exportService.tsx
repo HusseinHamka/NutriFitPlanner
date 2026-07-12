@@ -58,11 +58,19 @@ export class ExportService implements IExportService {
         headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a69cac' },
         body: JSON.stringify({
           sessionId: 'a69cac',
-          runId: 'pre-fix',
+          runId: 'post-fix',
           hypothesisId: 'A,B,C,D,E',
           location: 'exportService.tsx:exportPdf',
           message: 'PDF export layout snapshot',
           data: {
+            fixesApplied: {
+              noItalicFont: true,
+              noWrapFalseOnMeals: true,
+              noWorkoutLeadInOnDietPage: true,
+              filterEmptyMeals: true,
+              hideZeroKcalLabels: true,
+              dynamicPageNumbers: true,
+            },
             scheduleMode: diet?.scheduleMode ?? null,
             hardPageSplit: {
               coverPage: true,
