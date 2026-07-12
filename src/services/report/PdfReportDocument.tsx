@@ -219,6 +219,12 @@ const s = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 4,
   },
+  itemNote: {
+    fontSize: 7,
+    color: REPORT_COLORS.muted,
+    marginTop: 2,
+    lineHeight: 1.3,
+  },
   infoBox: {
     borderWidth: 1,
     borderColor: REPORT_COLORS.border,
@@ -367,9 +373,14 @@ function PdfMealItemsTable({ items }: { items: MealItem[] }) {
         <PdfTableHeaderCell width={MEAL_TABLE_COLS.qty}>Qty</PdfTableHeaderCell>
         <PdfTableHeaderCell width={MEAL_TABLE_COLS.kcal} isLast>Kcal</PdfTableHeaderCell>
       </View>
-      {visibleItems.map((item, index) => (
+      {visibleItems.map((item, index) => {
+        const itemNote = item.notes.trim()
+        return (
         <View key={item.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-          <PdfTableCell width={MEAL_TABLE_COLS.food}>{item.foodName || '—'}</PdfTableCell>
+          <View style={tableCellStyle(MEAL_TABLE_COLS.food)}>
+            <Text wrap style={s.tableCell}>{item.foodName || '—'}</Text>
+            {itemNote ? <Text wrap style={s.itemNote}>{itemNote}</Text> : null}
+          </View>
           <PdfTableCell width={MEAL_TABLE_COLS.qty}>
             {item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}
           </PdfTableCell>
@@ -377,7 +388,8 @@ function PdfMealItemsTable({ items }: { items: MealItem[] }) {
             {item.calories != null ? String(item.calories) : '—'}
           </PdfTableCell>
         </View>
-      ))}
+        )
+      })}
     </View>
   )
 }

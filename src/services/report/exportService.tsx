@@ -53,7 +53,10 @@ export class ExportService implements IExportService {
           day.meals.forEach((meal) => {
             paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${meal.name} (${mealTotalCalories(meal)} kcal)`, bold: true })] }))
             meal.items.filter((item) => item.foodName.trim() || item.quantity != null || item.calories).forEach((item) => {
-              paragraphs.push(new Paragraph(`${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal`))
+              const itemNote = item.notes.trim()
+              paragraphs.push(new Paragraph(
+                `${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal${itemNote ? ` · ${itemNote}` : ''}`,
+              ))
             })
             if (meal.notes) paragraphs.push(new Paragraph(meal.notes))
           })
@@ -65,7 +68,10 @@ export class ExportService implements IExportService {
           slot.options.forEach((option) => {
             paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${option.name} (${optionTotalCalories(option)} kcal)`, bold: true })] }))
             option.items.filter((item) => item.foodName.trim() || item.quantity != null || item.calories).forEach((item) => {
-              paragraphs.push(new Paragraph(`${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal`))
+              const itemNote = item.notes.trim()
+              paragraphs.push(new Paragraph(
+                `${item.foodName} · ${item.quantity ?? ''} ${item.unit} · ${item.calories ?? '—'} kcal${itemNote ? ` · ${itemNote}` : ''}`,
+              ))
             })
             if (option.notes) paragraphs.push(new Paragraph(option.notes))
           })

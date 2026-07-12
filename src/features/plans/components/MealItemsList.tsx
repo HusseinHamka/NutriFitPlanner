@@ -27,7 +27,7 @@ export function MealItemsList({ items, foodsById, onChange }: MealItemsListProps
     <div className="space-y-3">
       {items.map((item, itemIndex) => (
         <div key={item.id} className="flex gap-2">
-          <div className="grid flex-1 gap-2 md:grid-cols-6">
+          <div className="grid flex-1 gap-2 md:grid-cols-7">
             {item.mode === 'library' ? (
               <LibraryFoodPicker
                 value={item.foodId ? foodsById.get(item.foodId) ?? { id: item.foodId, name: item.foodName } as Food : null}
@@ -72,6 +72,11 @@ export function MealItemsList({ items, foodsById, onChange }: MealItemsListProps
               type="number"
               value={item.calories ?? ''}
               onChange={(e) => updateItem(itemIndex, { ...item, calories: e.target.value ? Number(e.target.value) : null })}
+            />
+            <Input
+              placeholder="Comment"
+              value={item.notes}
+              onChange={(e) => updateItem(itemIndex, { ...item, notes: e.target.value })}
             />
           </div>
           <Button variant="ghost" size="icon" aria-label="Remove item" onClick={() => removeItem(itemIndex)}>

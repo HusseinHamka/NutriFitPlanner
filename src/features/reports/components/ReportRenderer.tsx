@@ -37,7 +37,9 @@ function MealItemsTable({ items }: { items: MealItem[] }) {
         <span>Qty</span>
         <span className="text-right">Kcal</span>
       </div>
-      {visibleItems.map((item, index) => (
+      {visibleItems.map((item, index) => {
+        const itemNote = item.notes.trim()
+        return (
         <div
           key={item.id}
           className="grid grid-cols-[2fr_1fr_1fr] gap-2 border-t px-4 py-2 text-sm"
@@ -46,11 +48,17 @@ function MealItemsTable({ items }: { items: MealItem[] }) {
             backgroundColor: index % 2 === 1 ? REPORT_COLORS.sageLight : REPORT_COLORS.paper,
           }}
         >
-          <span>{item.foodName || '—'}</span>
+          <div>
+            <span>{item.foodName || '—'}</span>
+            {itemNote ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">{itemNote}</p>
+            ) : null}
+          </div>
           <span>{item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}</span>
           <span className="text-right">{item.calories ?? '—'}</span>
         </div>
-      ))}
+        )
+      })}
     </>
   )
 }
