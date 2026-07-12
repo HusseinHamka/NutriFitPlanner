@@ -306,9 +306,22 @@ const s = StyleSheet.create({
   colSupTiming: { width: '30%' },
 })
 
+function estimateMealCardHeight(itemCount: number, notes: string, includeDayTitle = false): number {
+  const noteLines = notes.trim() ? Math.max(1, notes.trim().split('\n').length) : 0
+  let height = 36 // title row + card padding
+  if (includeDayTitle) height += 22
+  if (itemCount > 0) height += 24 + itemCount * 22
+  if (noteLines > 0) height += 12 + noteLines * 11
+  return height + 12
+}
+
+function estimateWorkoutDayHeight(exerciseCount: number): number {
+  return 48 + 24 + exerciseCount * 22 + 12
+}
+
 function SectionHeader({ icon, title }: { icon: PdfReportIconKind; title: string }) {
   return (
-    <View style={s.sectionHeader}>
+    <View style={s.sectionHeader} minPresenceAhead={48}>
       <View style={s.sectionIcon}>
         <PdfSectionIcon kind={icon} />
       </View>
@@ -323,7 +336,7 @@ function PdfMealItemsTable({ items }: { items: MealItem[] }) {
   if (!visibleItems.length) return null
 
   return (
-    <>
+    <View>
       <View style={s.tableHeader}>
         <Text style={[s.tableHeaderCell, s.colFood]}>Food</Text>
         <Text style={[s.tableHeaderCell, s.colQty]}>Qty</Text>
@@ -340,22 +353,38 @@ function PdfMealItemsTable({ items }: { items: MealItem[] }) {
           </Text>
         </View>
       ))}
-    </>
+    </View>
   )
 }
 
-function PdfMealCard({ title, kcal, items, notes }: { title: string; kcal: number; items: MealItem[]; notes?: string }) {
+function PdfMealCard({
+  title,
+  kcal,
+  items,
+  notes,
+  dayTitle,
+}: {
+  title: string
+  kcal: number
+  items: MealItem[]
+  notes?: string
+  dayTitle?: string
+}) {
   const visibleItems = items.filter(isMeaningfulMealItem)
-  if (!visibleItems.length && !notes?.trim()) return null
+  const noteText = notes?.trim() ?? ''
+  if (!visibleItems.length && !noteText) return null
+
+  const minHeight = estimateMealCardHeight(visibleItems.length, noteText, Boolean(dayTitle))
 
   return (
-    <View style={s.mealCard}>
+    <View style={s.mealCard} wrap={false} minPresenceAhead={minHeight}>
+      {dayTitle ? <Text style={[s.dayTitle, { marginBottom: 6, paddingHorizontal: 12, paddingTop: 4 }]}>{dayTitle}</Text> : null}
       <View style={s.mealTitleRow}>
         <Text style={s.mealTitle}>{title}</Text>
         {kcal > 0 ? <Text style={s.mealKcal}>{kcal} kcal</Text> : null}
       </View>
       <PdfMealItemsTable items={items} />
-      {notes ? <Text style={s.mealNote}>{notes}</Text> : null}
+      {noteText ? <Text style={s.mealNote}>{noteText}</Text> : null}
     </View>
   )
 }
@@ -497,10 +526,10 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
                     const meals = day.meals.filter(mealHasReportContent)
                     return (
                       <View key={day.id} style={s.daySection}>
-                        <Text style={[s.dayTitle, { marginBottom: 8 }]}>{day.name}</Text>
-                        {meals.map((meal) => (
+                        {meals.map((meal, index) => (
                           <PdfMealCard
                             key={meal.id}
+                            dayTitle={index === 0 ? day.name : undefined}
                             title={meal.name}
                             kcal={mealTotalCalories(meal)}
                             items={meal.items}
@@ -508,32 +537,37 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
                           />
                         ))}
                         {dayKcal > 0 ? (
-                          <Text style={s.mealNote}>Day total: {dayKcal} kcal</Text>
+                          <View wrap={false} minPresenceAhead={24}>
+                            <Text style={s.mealNote}>Day total: {dayKcal} kcal</Text>
+                          </View>
                         ) : null}
                       </View>
                     )
                   })
-                : diet.mealSlots.filter(mealSlotHasContent).map((slot) => (
-                    <View key={slot.id} style={s.daySection}>
-                      <Text style={[s.dayTitle, { marginBottom: 8 }]}>{slot.name}</Text>
-                      {slot.options.filter(optionHasReportContent).map((option) => (
-                        <PdfMealCard
-                          key={option.id}
-                          title={option.name}
-                          kcal={optionTotalCalories(option)}
-                          items={option.items}
-                          notes={option.notes}
-                        />
-                      ))}
-                    </View>
-                  ))}
+                : diet.mealSlots.filter(mealSlotHasContent).map((slot) => {
+                    const options = slot.options.filter(optionHasReportContent)
+                    return (
+                      <View key={slot.id} style={s.daySection}>
+                        {options.map((option, index) => (
+                          <PdfMealCard
+                            key={option.id}
+                            dayTitle={index === 0 ? slot.name : undefined}
+                            title={option.name}
+                            kcal={optionTotalCalories(option)}
+                            items={option.items}
+                            notes={option.notes}
+                          />
+                        ))}
+                      </View>
+                    )
+                  })}
             </>
           ) : null}
 
           {supplements.length > 0 ? (
             <>
               <SectionHeader icon="star" title="Supplements" />
-              <View style={s.mealCard}>
+              <View style={s.mealCard} wrap={false} minPresenceAhead={36 + 24 + supplements.length * 22}>
                 <View style={s.tableHeader}>
                   <Text style={[s.tableHeaderCell, s.colSupName]}>Name</Text>
                   <Text style={[s.tableHeaderCell, s.colSupDose]}>Dose</Text>
@@ -551,14 +585,14 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
           ) : null}
 
           {showRecommendations ? (
-            <View style={s.infoBox}>
+            <View style={s.infoBox} wrap={false} minPresenceAhead={48}>
               <Text style={s.infoBoxLabel}>Recommendations</Text>
               <Text style={s.bodyText}>{diet.recommendations}</Text>
             </View>
           ) : null}
 
           {showDietNotes ? (
-            <View style={s.infoBox}>
+            <View style={s.infoBox} wrap={false} minPresenceAhead={48}>
               <Text style={s.infoBoxLabel}>Notes</Text>
               <Text style={s.bodyText}>{diet.notes}</Text>
             </View>
@@ -599,34 +633,42 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
               <SectionHeader icon="training" title="Training sessions" />
               {workout.days
                 .filter((day) => day.exercises.some((exercise) => exercise.exerciseName.trim().length > 0))
-                .map((day) => (
-                  <View key={day.id} style={s.dayCard}>
-                    <View style={s.dayHeader}>
-                      <Text style={s.dayTitle}>{day.name}</Text>
-                      {day.muscleGroups.trim() ? (
-                        <Text style={s.daySubtitle}>{day.muscleGroups.toUpperCase()}</Text>
-                      ) : null}
-                    </View>
-                    <View style={s.tableHeader}>
-                      <Text style={[s.tableHeaderCell, s.colExercise]}>Exercise</Text>
-                      <Text style={[s.tableHeaderCell, s.colSets]}>Sets</Text>
-                      <Text style={[s.tableHeaderCell, s.colReps]}>Reps</Text>
-                      <Text style={[s.tableHeaderCell, s.colRest]}>Rest</Text>
-                      <Text style={[s.tableHeaderCell, s.colNotes]}>Notes</Text>
-                    </View>
-                    {day.exercises
-                      .filter((exercise) => exercise.exerciseName.trim().length > 0)
-                      .map((exercise, index) => (
-                        <View key={exercise.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-                          <Text style={[s.tableCell, s.colExercise]}>{exercise.exerciseName || '—'}</Text>
-                          <Text style={[s.tableCell, s.colSets]}>{exercise.sets ?? '—'}</Text>
-                          <Text style={[s.tableCell, s.colReps]}>{exercise.reps || '—'}</Text>
-                          <Text style={[s.tableCell, s.colRest]}>{exercise.rest || '—'}</Text>
-                          <Text style={[s.tableCell, s.colNotes]}>{exercise.notes || '—'}</Text>
+                .map((day) => {
+                  const exercises = day.exercises.filter((exercise) => exercise.exerciseName.trim().length > 0)
+                  return (
+                    <View
+                      key={day.id}
+                      style={s.dayCard}
+                      wrap={false}
+                      minPresenceAhead={estimateWorkoutDayHeight(exercises.length)}
+                    >
+                      <View style={s.dayHeader}>
+                        <Text style={s.dayTitle}>{day.name}</Text>
+                        {day.muscleGroups.trim() ? (
+                          <Text style={s.daySubtitle}>{day.muscleGroups.toUpperCase()}</Text>
+                        ) : null}
+                      </View>
+                      <View>
+                        <View style={s.tableHeader}>
+                          <Text style={[s.tableHeaderCell, s.colExercise]}>Exercise</Text>
+                          <Text style={[s.tableHeaderCell, s.colSets]}>Sets</Text>
+                          <Text style={[s.tableHeaderCell, s.colReps]}>Reps</Text>
+                          <Text style={[s.tableHeaderCell, s.colRest]}>Rest</Text>
+                          <Text style={[s.tableHeaderCell, s.colNotes]}>Notes</Text>
                         </View>
-                      ))}
-                  </View>
-                ))}
+                        {exercises.map((exercise, index) => (
+                          <View key={exercise.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
+                            <Text style={[s.tableCell, s.colExercise]}>{exercise.exerciseName || '—'}</Text>
+                            <Text style={[s.tableCell, s.colSets]}>{exercise.sets ?? '—'}</Text>
+                            <Text style={[s.tableCell, s.colReps]}>{exercise.reps || '—'}</Text>
+                            <Text style={[s.tableCell, s.colRest]}>{exercise.rest || '—'}</Text>
+                            <Text style={[s.tableCell, s.colNotes]}>{exercise.notes || '—'}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )
+                })}
             </>
           ) : null}
 
@@ -640,7 +682,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
               ]
                 .filter((item) => meaningfulStructure(item.value))
                 .map((item) => (
-                  <View key={item.label} style={s.sessionCard}>
+                  <View key={item.label} style={s.sessionCard} wrap={false} minPresenceAhead={48}>
                     <Text style={s.infoBoxLabel}>{item.label}</Text>
                     <Text style={s.bodyText}>{item.value}</Text>
                   </View>
@@ -655,7 +697,7 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
       {notes ? (
         <Page size="A4" style={s.page}>
           <ReportHeader model={model} />
-          <View style={s.infoBox}>
+          <View style={s.infoBox} wrap={false} minPresenceAhead={48}>
             <Text style={s.infoBoxLabel}>Trainer Notes</Text>
             <Text style={s.bodyText}>{notes}</Text>
           </View>
