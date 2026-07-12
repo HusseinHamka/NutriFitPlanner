@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, Copy, Trash2 } from 'lucide-react'
+import { ChevronDown, Copy, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MealItemsList } from '@/features/plans/components/MealItemsList'
-import { createMeal, WEEKDAY_NAMES } from '@/lib/planSnapshot'
+import { createMeal, createWeeklyDietDay } from '@/lib/planSnapshot'
 import { dayTotalCalories, mealTotalCalories } from '@/services/report/reportLayout'
 import type { DietDay, Food, MealType } from '@/types/domain'
 import { cn } from '@/lib/utils'
@@ -30,13 +30,21 @@ interface WeeklyDietEditorProps {
   onChange: (weeklyDays: DietDay[]) => void
 }
 
+function reindexDays(days: DietDay[]): DietDay[] {
+  return days.map((day, index) => ({ ...day, sortOrder: index }))
+}
+
 export function WeeklyDietEditor({ weeklyDays, foodsById, onChange }: WeeklyDietEditorProps) {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() => new Set(weeklyDays.map((d) => d.id)))
+
+  const updateDays = (days: DietDay[]) => {
+    onChange(reindexDays(days))
+  }
 
   const updateDay = (dayIndex: number, next: DietDay) => {
     const days = [...weeklyDays]
     days[dayIndex] = next
-    onChange(days)
+    updateDays(days)
   }
 
   const toggleDay = (dayId: string) => {
@@ -65,6 +73,23 @@ export function WeeklyDietEditor({ weeklyDays, foodsById, onChange }: WeeklyDiet
     updateDay(targetIndex, { ...target, meals: copiedMeals })
   }
 
+  const addDay = () => {
+    const nextDay = createWeeklyDietDay(weeklyDays)
+    updateDays([...weeklyDays, nextDay])
+    setExpandedDays((prev) => new Set(prev).add(nextDay.id))
+  }
+
+  const removeDay = (dayIndex: number) => {
+    if (weeklyDays.length <= 1) return
+    const dayId = weeklyDays[dayIndex].id
+    updateDays(weeklyDays.filter((_, index) => index !== dayIndex))
+    setExpandedDays((prev) => {
+      const next = new Set(prev)
+      next.delete(dayId)
+      return next
+    })
+  }
+
   return (
     <div className="space-y-3">
       {weeklyDays.map((day, dayIndex) => {
@@ -75,36 +100,57 @@ export function WeeklyDietEditor({ weeklyDays, foodsById, onChange }: WeeklyDiet
         return (
           <Card key={day.id} className="border-border bg-paper">
             <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
-              <button
-                type="button"
-                className="flex flex-1 items-center gap-2 text-left"
-                onClick={() => toggleDay(day.id)}
-              >
-                <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', !isExpanded && '-rotate-90')} />
-                <div>
-                  <CardTitle className="text-base">{day.name}</CardTitle>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  className="shrink-0"
+                  aria-label={isExpanded ? 'Collapse day' : 'Expand day'}
+                  onClick={() => toggleDay(day.id)}
+                >
+                  <ChevronDown className={cn('h-4 w-4 transition-transform', !isExpanded && '-rotate-90')} />
+                </button>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Input
+                    value={day.name}
+                    aria-label="Day name"
+                    className="h-8 max-w-xs font-heading text-base font-semibold"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => updateDay(dayIndex, { ...day, name: e.target.value })}
+                  />
                   <p className="text-xs text-muted-foreground">
                     {hasMeals ? `${day.meals.length} meal${day.meals.length === 1 ? '' : 's'} · ${dayTotal} kcal` : 'No meals yet'}
                   </p>
                 </div>
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Copy className="mr-1 h-3 w-3" />
-                    Copy to
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Copy className="mr-1 h-3 w-3" />
+                      Copy to
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {weeklyDays.map((target, targetIndex) =>
+                      targetIndex !== dayIndex ? (
+                        <DropdownMenuItem key={target.id} onClick={() => copyDayTo(dayIndex, targetIndex)}>
+                          {target.name}
+                        </DropdownMenuItem>
+                      ) : null,
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {weeklyDays.length > 1 ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove ${day.name}`}
+                    onClick={() => removeDay(dayIndex)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {WEEKDAY_NAMES.map((name, targetIndex) => (
-                    targetIndex !== dayIndex ? (
-                      <DropdownMenuItem key={name} onClick={() => copyDayTo(dayIndex, targetIndex)}>
-                        {name}
-                      </DropdownMenuItem>
-                    ) : null
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                ) : null}
+              </div>
             </CardHeader>
 
             {isExpanded ? (
@@ -176,6 +222,11 @@ export function WeeklyDietEditor({ weeklyDays, foodsById, onChange }: WeeklyDiet
           </Card>
         )
       })}
+
+      <Button type="button" variant="outline" className="w-full" onClick={addDay}>
+        <Plus className="mr-2 h-4 w-4" />
+        Add day
+      </Button>
     </div>
   )
 }

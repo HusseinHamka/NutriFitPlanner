@@ -114,18 +114,33 @@ export function createMealSlot(mealType: MealType, name: string, sortOrder: numb
   }
 }
 
-export function createDietDay(dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6, name?: string): DietDay {
+export function createDietDay(
+  sortOrder: number,
+  name?: string,
+  dayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6,
+): DietDay {
+  const weekday = dayOfWeek != null && dayOfWeek >= 0 && dayOfWeek <= 6 ? dayOfWeek : undefined
+  const defaultName =
+    name?.trim()
+    || (weekday != null ? WEEKDAY_NAMES[weekday] : `Day ${sortOrder + 1}`)
+
   return {
     id: createId(),
-    name: name ?? WEEKDAY_NAMES[dayOfWeek],
-    dayOfWeek,
-    sortOrder: dayOfWeek,
+    name: defaultName,
+    ...(weekday != null ? { dayOfWeek: weekday } : {}),
+    sortOrder,
     meals: [],
   }
 }
 
 export function createEmptyWeeklyDays(): DietDay[] {
-  return WEEKDAY_NAMES.map((name, index) => createDietDay(index as 0 | 1 | 2 | 3 | 4 | 5 | 6, name))
+  return WEEKDAY_NAMES.map((name, index) =>
+    createDietDay(index, name, index as 0 | 1 | 2 | 3 | 4 | 5 | 6),
+  )
+}
+
+export function createWeeklyDietDay(existingDays: DietDay[]): DietDay {
+  return createDietDay(existingDays.length, `Day ${existingDays.length + 1}`)
 }
 
 export function createEmptyMealSlots(): MealSlot[] {
@@ -305,15 +320,22 @@ function normalizeMealSlot(slot: Partial<MealSlot>, index: number): MealSlot {
 }
 
 function normalizeDietDay(day: Partial<DietDay>, index: number): DietDay {
-  const dayOfWeek = (typeof day.dayOfWeek === 'number' && day.dayOfWeek >= 0 && day.dayOfWeek <= 6
-    ? day.dayOfWeek
-    : index) as 0 | 1 | 2 | 3 | 4 | 5 | 6
+  const sortOrder = typeof day.sortOrder === 'number' ? day.sortOrder : index
+  const hasWeekday =
+    typeof day.dayOfWeek === 'number' && day.dayOfWeek >= 0 && day.dayOfWeek <= 6
+  const weekday = hasWeekday ? (day.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6) : undefined
+  const name =
+    typeof day.name === 'string' && day.name.trim()
+      ? day.name.trim()
+      : weekday != null
+        ? WEEKDAY_NAMES[weekday]
+        : `Day ${sortOrder + 1}`
 
   return {
     id: day.id ?? createId(),
-    name: day.name ?? WEEKDAY_NAMES[dayOfWeek],
-    dayOfWeek,
-    sortOrder: day.sortOrder ?? dayOfWeek,
+    name,
+    ...(weekday != null ? { dayOfWeek: weekday } : {}),
+    sortOrder,
     meals: Array.isArray(day.meals) ? day.meals.map(normalizeMeal) : [],
   }
 }
@@ -379,7 +401,9 @@ export function normalizeDietContent(diet: Partial<DietPlanContent> | null | und
     scheduleMode = 'weekly'
     weeklyDays =
       Array.isArray(diet.weeklyDays) && diet.weeklyDays.length > 0
-        ? diet.weeklyDays.map(normalizeDietDay)
+        ? diet.weeklyDays
+            .map(normalizeDietDay)
+            .sort((a, b) => a.sortOrder - b.sortOrder)
         : createEmptyWeeklyDays()
     mealSlots = createEmptyMealSlots()
   } else {

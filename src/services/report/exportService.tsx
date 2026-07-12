@@ -47,7 +47,7 @@ export class ExportService implements IExportService {
       }
 
       if (diet.scheduleMode === 'weekly') {
-        diet.weeklyDays.forEach((day) => {
+        [...diet.weeklyDays].sort((a, b) => a.sortOrder - b.sortOrder).forEach((day) => {
           if (!day.meals.length) return
           paragraphs.push(new Paragraph({ children: [new TextRun({ text: day.name, bold: true })] }))
           day.meals.forEach((meal) => {

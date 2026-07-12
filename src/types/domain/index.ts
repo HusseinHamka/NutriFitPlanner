@@ -137,7 +137,8 @@ export interface MealSlot {
 export interface DietDay {
   id: string
   name: string
-  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6
+  /** Mon=0 … Sun=6 for default week rows; omitted for custom-added days. */
+  dayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | null
   sortOrder: number
   meals: Meal[]
 }

@@ -546,7 +546,10 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
                 <Text style={s.bodyText}>Choose one option per meal.</Text>
               ) : null}
               {diet.scheduleMode === 'weekly'
-                ? diet.weeklyDays.filter(dietDayHasContent).map((day) => {
+                ? [...diet.weeklyDays]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .filter(dietDayHasContent)
+                    .map((day) => {
                     const dayKcal = dayTotalCalories(day)
                     const meals = day.meals.filter(mealHasReportContent)
                     return (

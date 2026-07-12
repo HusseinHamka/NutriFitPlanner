@@ -244,7 +244,10 @@ export function ReportRenderer({ model }: ReportRendererProps) {
               ) : null}
               <div className="space-y-4">
                 {diet.scheduleMode === 'weekly'
-                  ? diet.weeklyDays.filter(dietDayHasContent).map((day) => (
+                  ? [...diet.weeklyDays]
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .filter(dietDayHasContent)
+                      .map((day) => (
                       <div key={day.id} className="space-y-3">
                         <WeeklyMealSchedule meals={day.meals} dayName={day.name} />
                         <p className="text-sm text-muted-foreground">Day total: {dayTotalCalories(day)} kcal</p>
