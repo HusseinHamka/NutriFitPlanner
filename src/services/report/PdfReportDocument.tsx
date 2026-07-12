@@ -30,6 +30,12 @@ import {
 } from '@/services/report/reportLayout'
 import { PdfBrandMark, PdfSectionIcon, type PdfReportIconKind } from '@/services/report/pdfIcons'
 import { registerPdfFonts } from '@/services/report/pdfFonts'
+import {
+  MEAL_TABLE_COLS,
+  SUPPLEMENT_TABLE_COLS,
+  WORKOUT_TABLE_COLS,
+  tableCellStyle,
+} from '@/services/report/pdfTableColumns'
 
 registerPdfFonts()
 
@@ -187,10 +193,10 @@ const s = StyleSheet.create({
     backgroundColor: REPORT_COLORS.softSage,
     paddingVertical: 6,
     paddingHorizontal: 12,
+    alignItems: 'flex-start',
   },
   tableHeaderCell: {
     fontSize: 7,
-    letterSpacing: 0.8,
     color: REPORT_COLORS.deepForest,
     fontWeight: 700,
     textTransform: 'uppercase',
@@ -201,9 +207,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: 1,
     borderTopColor: REPORT_COLORS.border,
+    alignItems: 'flex-start',
   },
   tableRowAlt: { backgroundColor: REPORT_COLORS.sageLight },
-  tableCell: { fontSize: 9, color: REPORT_COLORS.ink },
+  tableCell: { fontSize: 9, color: REPORT_COLORS.ink, lineHeight: 1.35 },
+  tableCellRight: { fontSize: 9, color: REPORT_COLORS.ink, lineHeight: 1.35, textAlign: 'right' },
   mealNote: {
     fontSize: 8,
     color: REPORT_COLORS.muted,
@@ -293,17 +301,6 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: REPORT_COLORS.muted,
   },
-  colFood: { width: '50%' },
-  colQty: { width: '25%' },
-  colKcal: { width: '25%', textAlign: 'right' },
-  colExercise: { width: '34%' },
-  colSets: { width: '12%' },
-  colReps: { width: '12%' },
-  colRest: { width: '18%' },
-  colNotes: { width: '24%' },
-  colSupName: { width: '40%' },
-  colSupDose: { width: '30%' },
-  colSupTiming: { width: '30%' },
 })
 
 function estimateMealCardHeight(itemCount: number, notes: string, includeDayTitle = false): number {
@@ -331,6 +328,34 @@ function SectionHeader({ icon, title }: { icon: PdfReportIconKind; title: string
   )
 }
 
+function PdfTableHeaderCell({ width, children, isLast = false }: { width: number; children: string; isLast?: boolean }) {
+  return (
+    <View style={tableCellStyle(width, isLast)}>
+      <Text style={s.tableHeaderCell}>{children}</Text>
+    </View>
+  )
+}
+
+function PdfTableCell({
+  width,
+  children,
+  align = 'left',
+  isLast = false,
+}: {
+  width: number
+  children: string
+  align?: 'left' | 'right'
+  isLast?: boolean
+}) {
+  return (
+    <View style={tableCellStyle(width, isLast)}>
+      <Text wrap style={align === 'right' ? s.tableCellRight : s.tableCell}>
+        {children}
+      </Text>
+    </View>
+  )
+}
+
 function PdfMealItemsTable({ items }: { items: MealItem[] }) {
   const visibleItems = items.filter(isMeaningfulMealItem)
   if (!visibleItems.length) return null
@@ -338,19 +363,19 @@ function PdfMealItemsTable({ items }: { items: MealItem[] }) {
   return (
     <View>
       <View style={s.tableHeader}>
-        <Text style={[s.tableHeaderCell, s.colFood]}>Food</Text>
-        <Text style={[s.tableHeaderCell, s.colQty]}>Qty</Text>
-        <Text style={[s.tableHeaderCell, s.colKcal]}>Kcal</Text>
+        <PdfTableHeaderCell width={MEAL_TABLE_COLS.food}>Food</PdfTableHeaderCell>
+        <PdfTableHeaderCell width={MEAL_TABLE_COLS.qty}>Qty</PdfTableHeaderCell>
+        <PdfTableHeaderCell width={MEAL_TABLE_COLS.kcal} isLast>Kcal</PdfTableHeaderCell>
       </View>
       {visibleItems.map((item, index) => (
         <View key={item.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-          <Text style={[s.tableCell, s.colFood]}>{item.foodName || '—'}</Text>
-          <Text style={[s.tableCell, s.colQty]}>
+          <PdfTableCell width={MEAL_TABLE_COLS.food}>{item.foodName || '—'}</PdfTableCell>
+          <PdfTableCell width={MEAL_TABLE_COLS.qty}>
             {item.quantity != null ? `${item.quantity} ${item.unit}` : '—'}
-          </Text>
-          <Text style={[s.tableCell, s.colKcal]}>
+          </PdfTableCell>
+          <PdfTableCell width={MEAL_TABLE_COLS.kcal} align="right" isLast>
             {item.calories != null ? String(item.calories) : '—'}
-          </Text>
+          </PdfTableCell>
         </View>
       ))}
     </View>
@@ -569,15 +594,15 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
               <SectionHeader icon="star" title="Supplements" />
               <View style={s.mealCard} wrap={false} minPresenceAhead={36 + 24 + supplements.length * 22}>
                 <View style={s.tableHeader}>
-                  <Text style={[s.tableHeaderCell, s.colSupName]}>Name</Text>
-                  <Text style={[s.tableHeaderCell, s.colSupDose]}>Dose</Text>
-                  <Text style={[s.tableHeaderCell, s.colSupTiming]}>Timing</Text>
+                  <PdfTableHeaderCell width={SUPPLEMENT_TABLE_COLS.name}>Name</PdfTableHeaderCell>
+                  <PdfTableHeaderCell width={SUPPLEMENT_TABLE_COLS.dose}>Dose</PdfTableHeaderCell>
+                  <PdfTableHeaderCell width={SUPPLEMENT_TABLE_COLS.timing} isLast>Timing</PdfTableHeaderCell>
                 </View>
                 {supplements.map((row, index) => (
                   <View key={row.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-                    <Text style={[s.tableCell, s.colSupName]}>{row.name}</Text>
-                    <Text style={[s.tableCell, s.colSupDose]}>{row.dose || '—'}</Text>
-                    <Text style={[s.tableCell, s.colSupTiming]}>{row.timing || '—'}</Text>
+                    <PdfTableCell width={SUPPLEMENT_TABLE_COLS.name}>{row.name}</PdfTableCell>
+                    <PdfTableCell width={SUPPLEMENT_TABLE_COLS.dose}>{row.dose || '—'}</PdfTableCell>
+                    <PdfTableCell width={SUPPLEMENT_TABLE_COLS.timing} isLast>{row.timing || '—'}</PdfTableCell>
                   </View>
                 ))}
               </View>
@@ -650,19 +675,19 @@ export function PdfReportDocument({ model }: { model: ReportModel }) {
                       </View>
                       <View>
                         <View style={s.tableHeader}>
-                          <Text style={[s.tableHeaderCell, s.colExercise]}>Exercise</Text>
-                          <Text style={[s.tableHeaderCell, s.colSets]}>Sets</Text>
-                          <Text style={[s.tableHeaderCell, s.colReps]}>Reps</Text>
-                          <Text style={[s.tableHeaderCell, s.colRest]}>Rest</Text>
-                          <Text style={[s.tableHeaderCell, s.colNotes]}>Notes</Text>
+                          <PdfTableHeaderCell width={WORKOUT_TABLE_COLS.exercise}>Exercise</PdfTableHeaderCell>
+                          <PdfTableHeaderCell width={WORKOUT_TABLE_COLS.sets}>Sets</PdfTableHeaderCell>
+                          <PdfTableHeaderCell width={WORKOUT_TABLE_COLS.reps}>Reps</PdfTableHeaderCell>
+                          <PdfTableHeaderCell width={WORKOUT_TABLE_COLS.rest}>Rest</PdfTableHeaderCell>
+                          <PdfTableHeaderCell width={WORKOUT_TABLE_COLS.notes} isLast>Notes</PdfTableHeaderCell>
                         </View>
                         {exercises.map((exercise, index) => (
                           <View key={exercise.id} style={[s.tableRow, index % 2 === 1 ? s.tableRowAlt : {}]}>
-                            <Text style={[s.tableCell, s.colExercise]}>{exercise.exerciseName || '—'}</Text>
-                            <Text style={[s.tableCell, s.colSets]}>{exercise.sets ?? '—'}</Text>
-                            <Text style={[s.tableCell, s.colReps]}>{exercise.reps || '—'}</Text>
-                            <Text style={[s.tableCell, s.colRest]}>{exercise.rest || '—'}</Text>
-                            <Text style={[s.tableCell, s.colNotes]}>{exercise.notes || '—'}</Text>
+                            <PdfTableCell width={WORKOUT_TABLE_COLS.exercise}>{exercise.exerciseName || '—'}</PdfTableCell>
+                            <PdfTableCell width={WORKOUT_TABLE_COLS.sets}>{exercise.sets != null ? String(exercise.sets) : '—'}</PdfTableCell>
+                            <PdfTableCell width={WORKOUT_TABLE_COLS.reps}>{exercise.reps || '—'}</PdfTableCell>
+                            <PdfTableCell width={WORKOUT_TABLE_COLS.rest}>{exercise.rest || '—'}</PdfTableCell>
+                            <PdfTableCell width={WORKOUT_TABLE_COLS.notes} isLast>{exercise.notes || '—'}</PdfTableCell>
                           </View>
                         ))}
                       </View>
