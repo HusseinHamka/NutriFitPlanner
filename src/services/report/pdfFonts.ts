@@ -1,51 +1,57 @@
 import { Font } from '@react-pdf/renderer'
+import lora400 from '@fontsource/lora/files/lora-latin-400-normal.woff?url'
+import lora700 from '@fontsource/lora/files/lora-latin-700-normal.woff?url'
+import nunito400 from '@fontsource/nunito-sans/files/nunito-sans-latin-400-normal.woff?url'
+import nunito600 from '@fontsource/nunito-sans/files/nunito-sans-latin-600-normal.woff?url'
+import nunito700 from '@fontsource/nunito-sans/files/nunito-sans-latin-700-normal.woff?url'
 
-let registered = false
+let fontsReady: Promise<void> | null = null
 
-export function registerPdfFonts() {
-  if (registered) return
-  registered = true
+async function toDataUrl(url: string): Promise<string> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to load font asset (${response.status})`)
+  }
+
+  const blob = await response.blob()
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read font asset'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function registerEmbeddedFonts(): Promise<void> {
+  const [lora400Data, lora700Data, nunito400Data, nunito600Data, nunito700Data] = await Promise.all([
+    toDataUrl(lora400),
+    toDataUrl(lora700),
+    toDataUrl(nunito400),
+    toDataUrl(nunito600),
+    toDataUrl(nunito700),
+  ])
 
   Font.register({
     family: 'Lora',
     fonts: [
-      {
-        src: 'https://cdn.jsdelivr.net/fontsource/fonts/lora@latest/latin-400-normal.woff',
-        fontWeight: 400,
-      },
-      {
-        src: 'https://cdn.jsdelivr.net/fontsource/fonts/lora@latest/latin-700-normal.woff',
-        fontWeight: 700,
-      },
+      { src: lora400Data, fontWeight: 400 },
+      { src: lora700Data, fontWeight: 700 },
     ],
   })
 
   Font.register({
     family: 'NunitoSans',
     fonts: [
-      {
-        src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-400-normal.woff',
-        fontWeight: 400,
-      },
-      {
-        src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-600-normal.woff',
-        fontWeight: 600,
-      },
-      {
-        src: 'https://cdn.jsdelivr.net/fontsource/fonts/nunito-sans@latest/latin-700-normal.woff',
-        fontWeight: 700,
-      },
+      { src: nunito400Data, fontWeight: 400 },
+      { src: nunito600Data, fontWeight: 600 },
+      { src: nunito700Data, fontWeight: 700 },
     ],
   })
 }
 
 export async function ensurePdfFontsLoaded() {
-  registerPdfFonts()
-  await Promise.all([
-    Font.load({ fontFamily: 'Lora', fontWeight: 400 }),
-    Font.load({ fontFamily: 'Lora', fontWeight: 700 }),
-    Font.load({ fontFamily: 'NunitoSans', fontWeight: 400 }),
-    Font.load({ fontFamily: 'NunitoSans', fontWeight: 600 }),
-    Font.load({ fontFamily: 'NunitoSans', fontWeight: 700 }),
-  ])
+  if (!fontsReady) {
+    fontsReady = registerEmbeddedFonts()
+  }
+  await fontsReady
 }

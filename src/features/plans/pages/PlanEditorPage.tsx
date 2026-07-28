@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { saveAs } from 'file-saver'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -23,6 +22,7 @@ import { DietPlanEditor } from '@/features/plans/components/DietPlanEditor'
 import { WorkoutPlanEditor } from '@/features/plans/components/WorkoutPlanEditor'
 import { ReportRenderer } from '@/features/reports/components/ReportRenderer'
 import { formatDateTime, fullName, buildReportTitle } from '@/lib/helpers'
+import { downloadBlob } from '@/lib/downloadBlob'
 import { normalizePlanSnapshot } from '@/lib/planSnapshot'
 import { queryKeys } from '@/lib/queryKeys'
 import type { PlanSnapshot, PlanStatus } from '@/types/domain'
@@ -161,9 +161,9 @@ export default function PlanEditorPage() {
       const blob = await services.export.exportPdf(previewModel)
       const clientName = fullName(previewModel.client.firstName, previewModel.client.lastName)
       const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'pdf')
-      saveAs(blob, `${plan?.title ?? 'report'}.pdf`)
+      const openedOnIos = downloadBlob(blob, `${plan?.title ?? 'report'}.pdf`)
       await services.reports.create({ planRevisionId: previewModel.revision.id, clientId: previewModel.client.id, title, format: 'pdf' })
-      toast.success('PDF exported')
+      toast.success(openedOnIos ? 'PDF opened — use Share to save' : 'PDF exported')
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'PDF export failed')
     }
@@ -175,7 +175,7 @@ export default function PlanEditorPage() {
       const blob = await services.export.exportDocx(previewModel)
       const clientName = fullName(previewModel.client.firstName, previewModel.client.lastName)
       const title = buildReportTitle(plan?.title ?? 'Report', clientName, 'docx')
-      saveAs(blob, `${plan?.title ?? 'report'}.docx`)
+      downloadBlob(blob, `${plan?.title ?? 'report'}.docx`)
       await services.reports.create({ planRevisionId: previewModel.revision.id, clientId: previewModel.client.id, title, format: 'docx' })
       toast.success('DOCX exported')
     } catch (error: unknown) {

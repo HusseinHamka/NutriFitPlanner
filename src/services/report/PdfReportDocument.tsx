@@ -29,15 +29,12 @@ import {
   trainerNotes,
 } from '@/services/report/reportLayout'
 import { PdfBrandMark, PdfSectionIcon, type PdfReportIconKind } from '@/services/report/pdfIcons'
-import { registerPdfFonts } from '@/services/report/pdfFonts'
 import {
   MEAL_TABLE_COLS,
   SUPPLEMENT_TABLE_COLS,
   WORKOUT_TABLE_COLS,
   tableCellStyle,
 } from '@/services/report/pdfTableColumns'
-
-registerPdfFonts()
 
 const s = StyleSheet.create({
   page: {
