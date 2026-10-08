@@ -147,6 +147,11 @@ export function createEmptyMealSlots(): MealSlot[] {
   return MEAL_SLOT_DEFS.map((def, index) => createMealSlot(def.mealType, def.name, index))
 }
 
+export function createCustomMealSlot(existingSlots: MealSlot[]): MealSlot {
+  const nextIndex = existingSlots.length
+  return createMealSlot('custom', `Meal ${nextIndex + 1}`, nextIndex)
+}
+
 export function defaultOptionName(sortOrder: number): string {
   return `Option ${String.fromCharCode(65 + sortOrder)}`
 }
@@ -305,16 +310,22 @@ function normalizeMealOption(option: Partial<MealOption>, index: number): MealOp
 }
 
 function normalizeMealSlot(slot: Partial<MealSlot>, index: number): MealSlot {
-  const def = MEAL_SLOT_DEFS[index] ?? MEAL_SLOT_DEFS[0]
+  const def = MEAL_SLOT_DEFS.find((entry) => entry.mealType === slot.mealType)
+    ?? MEAL_SLOT_DEFS[index]
   const options = Array.isArray(slot.options) && slot.options.length > 0
     ? slot.options.map(normalizeMealOption)
     : [createMealOption('Option A', 0)]
+  const name =
+    typeof slot.name === 'string' && slot.name.trim()
+      ? slot.name.trim()
+      : def?.name ?? `Meal ${index + 1}`
+  const mealType: MealType = slot.mealType ?? def?.mealType ?? 'custom'
 
   return {
     id: slot.id ?? createId(),
-    mealType: slot.mealType ?? def.mealType,
-    name: slot.name ?? def.name,
-    sortOrder: slot.sortOrder ?? index,
+    mealType,
+    name,
+    sortOrder: typeof slot.sortOrder === 'number' ? slot.sortOrder : index,
     options,
   }
 }
@@ -410,7 +421,9 @@ export function normalizeDietContent(diet: Partial<DietPlanContent> | null | und
     scheduleMode = 'meal_options'
     mealSlots =
       Array.isArray(diet.mealSlots) && diet.mealSlots.length > 0
-        ? diet.mealSlots.map(normalizeMealSlot)
+        ? diet.mealSlots
+            .map(normalizeMealSlot)
+            .sort((a, b) => a.sortOrder - b.sortOrder)
         : createEmptyMealSlots()
     weeklyDays = createEmptyWeeklyDays()
   }
